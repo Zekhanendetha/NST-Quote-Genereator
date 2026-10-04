@@ -10,7 +10,7 @@ QuoteForge is a browser-based oil and gas commercial quotation workspace. It let
 1. Dashboard (`/`) shows persistent quote history and aggregate revenue, cost, profit, and margin.
 2. New quote (`/quotes/new`) captures parties, line items, settings, company identity, and notes. Totals and P&L update live.
 3. Save creates a persistent quote and opens its saved URL (`/quotes/:id`). Saved quotes can be edited and saved again.
-4. Print / PDF uses the browser print dialog and a clean A4 quotation preview. The preview is always rendered below the builder and uses the editable company/client fields.
+4. Print / PDF uses the browser print dialog and a clean A4 quotation preview. The preview is always rendered below the builder and uses the editable company/client fields. Its commercial table separates description, type/basis, quantity, effective item price, and final line amount; detailed specifications remain under the item description.
 
 ## Auth and integrations
 There is no authentication. PDF export is implemented through the browser print-to-PDF flow; no third-party integration is configured.

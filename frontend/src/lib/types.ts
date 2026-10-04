@@ -66,7 +66,7 @@ export interface Quote extends QuotePayload {
   commission_per_line: number;
 }
 
-export const CURRENCIES = ["USD", "EUR", "GBP", "AED", "SAR", "NGN"];
+export const CURRENCIES = ["USD", "IDR", "EUR", "GBP", "AED", "SAR", "SGD", "MYR", "AUD", "CAD", "JPY", "CNY", "QAR", "KWD", "NGN"];
 export const CATEGORY_LABELS: Record<LineCategory, string> = {
   sales: "Sales",
   rental: "Rental",
