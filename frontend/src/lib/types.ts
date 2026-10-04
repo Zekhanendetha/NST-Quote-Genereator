@@ -36,6 +36,8 @@ export interface QuotePayload {
   client_company: string;
   client_email: string;
   client_location: string;
+  customer_reference: string;
+  delivery_point: string;
   company_name: string;
   company_address: string;
   company_email: string;
@@ -44,6 +46,7 @@ export interface QuotePayload {
   prepared_by_name: string;
   prepared_by_title: string;
   quote_title: string;
+  subject: string;
   currency: string;
   tax_enabled: boolean;
   tax_rate: number;

@@ -148,4 +148,6 @@
   @page { size: A4; margin: 12mm; }
   body { background: white !important; }
   .print-document { display: block !important; margin: 0 !important; max-width: none !important; padding: 0 !important; box-shadow: none !important; }
+  .quotation-page { break-after: page; page-break-after: always; }
+  .quotation-page:last-of-type { break-after: auto; page-break-after: auto; }
 }

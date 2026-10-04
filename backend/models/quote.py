@@ -34,6 +34,8 @@ class QuoteCreate(BaseModel):
     client_company: str = Field(min_length=1)
     client_email: str = ""
     client_location: str = ""
+    customer_reference: str = ""
+    delivery_point: str = ""
     company_name: str = Field(min_length=1)
     company_address: str = ""
     company_email: str = ""
@@ -42,6 +44,7 @@ class QuoteCreate(BaseModel):
     prepared_by_name: str = ""
     prepared_by_title: str = ""
     quote_title: str = "Commercial Quotation"
+    subject: str = ""
     currency: str = Field(default="USD", min_length=3, max_length=3)
     tax_enabled: bool = False
     tax_rate: float = Field(default=0, ge=0, le=100)
@@ -75,6 +78,8 @@ class Quote(BaseModel):
     client_company: str
     client_email: str
     client_location: str
+    customer_reference: str = ""
+    delivery_point: str = ""
     company_name: str
     company_address: str
     company_email: str
@@ -83,6 +88,7 @@ class Quote(BaseModel):
     prepared_by_name: str = ""
     prepared_by_title: str = ""
     quote_title: str
+    subject: str = ""
     currency: str
     tax_enabled: bool
     tax_rate: float

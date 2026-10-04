@@ -1,0 +1,74 @@
+{
+  "iteration": 1,
+  "summary": "All 8 acceptance criteria exercised: 1 backend test file + 8 browser checks, all passed.",
+  "passed": 9,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Release pack saves persistent metadata",
+      "name": "test_tscheck_release_pack_persistence.py::test_release_pack_persists_metadata_on_reopen",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/quotes (201/200) created quote with subject, customer_reference, delivery_point, lead_time, company_logo (data URL), quote_number, release_date, prepared_by_name/title, release_notes; GET /api/quotes/{id} (200) returned identical values for all fields."
+    },
+    {
+      "criterion": "Quotation page uses TOTAL, centered topmost logo, and CONFIDENTIAL above Commercial Offer",
+      "name": "quote-logo-confidential-total-layout",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Uploaded logo via company-logo-input; preview-company-logo visible above preview-quote-title (y-coord check), horizontally centered within wrapper (<=5px delta); innerText of confidential block shows CONFIDENTIAL before COMMERCIAL OFFER; preview-total label text 'TOTAL' visible."
+    },
+    {
+      "criterion": "Parties captures customer reference, delivery point, and delivery lead time",
+      "name": "quote-parties-fields-flow-into-document",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Filled customer-reference-input, delivery-point-input, lead-time-input; preview customer block innerText contained ref and delivery point strings; terms-delivery block on terms page contained the lead time value."
+    },
+    {
+      "criterion": "Quotation subject drives proposal introduction",
+      "name": "quote-subject-drives-introduction",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Filled company-name-input and quote-subject-input; preview-subject text matched exactly; preview-introduction innerText contained both the exact company name and subject strings."
+    },
+    {
+      "criterion": "Commercial table separates quantity and UoM",
+      "name": "quote-commercial-table-qty-uom-separate",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Set quantity=4, uom=set, sell_rate=2500 on line 0; preview-line-quantity-0 showed '4', preview-line-uom-0 showed 'SET', distinct values; preview-line-category-0 (type/basis), preview-line-item-price-0, preview-line-amount-0 all populated."
+    },
+    {
+      "criterion": "Dedicated Terms and Conditions page contains dynamic and fixed clauses",
+      "name": "quote-terms-and-conditions-page-clauses",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Set currency=EUR, payment terms, lead time, subject; terms-price-basis contained 'EUR'; terms-payment contained entered payment text; terms-delivery contained lead time + 'purchase order' wording; terms-scope contained subject; terms-order-confirmation contained 'written confirmation'; terms-change-order contained 'change' clause."
+    },
+    {
+      "criterion": "Dedicated Customer Acceptance page is complete",
+      "name": "quote-customer-acceptance-page-complete",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "acceptance-wording contains acknowledgement text; 'For and on Behalf of' visible with acceptance-customer-name showing entered customer company; Name/Designation/Date/Signature labels all visible with blank underline areas."
+    },
+    {
+      "criterion": "Seller signoff is one Best Regards box",
+      "name": "quote-seller-signoff-single-box",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "preview-signature-block count === 1; block innerText contains 'Best Regards', company name, preparer name, and preparer title; signature space element visible inside same box."
+    },
+    {
+      "criterion": "Release pack saves persistent metadata",
+      "name": "quote-save-persists-metadata-on-reopen",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Ran against public preview URL. Filled subject, customer ref, delivery point, lead time, logo, custom quote number, preparer name, release note; saved via builder-save-button, URL changed to /quotes/{id}, page reloaded, and all fields (including logo preview) retained their entered values after reload from backend."
+    }
+  ]
+}
