@@ -243,13 +243,23 @@ export default function QuoteBuilder() {
     if (!form.company_name.trim()) missing.push("Workspace legal company name");
     if (!form.client_name.trim()) missing.push("Customer contact name");
     if (!form.client_company.trim()) missing.push("Customer company name");
+    if (!form.client_email.trim()) missing.push("Customer email address");
+    if (!form.client_location.trim()) missing.push("Customer location");
+    if (!form.customer_reference.trim()) missing.push("Customer reference number");
+    if (!form.delivery_point.trim()) missing.push("Delivery point");
+    if (!form.lead_time.trim()) missing.push("Delivery lead time");
     if (!form.subject.trim()) missing.push("Quotation subject");
+    if (!form.quote_title.trim()) missing.push("Quotation title");
+    if (!form.currency.trim()) missing.push("Currency");
     if (!form.release_date && !quoteQuery.data?.release_date && !quoteQuery.data?.issue_date) missing.push("Release date");
     if (!form.prepared_by_name.trim()) missing.push("Preparer name");
     if (!form.prepared_by_title.trim()) missing.push("Preparer designation");
     if (!form.prepared_by_email.trim()) missing.push("Preparer email address");
     if (!form.prepared_by_phone.trim()) missing.push("Preparer phone number");
     if (form.currency !== "USD" && !(form.usd_exchange_rate && form.usd_exchange_rate > 0)) missing.push(`USD conversion rate for ${form.currency}`);
+    if (form.tax_enabled && !(form.tax_rate > 0)) missing.push("Sales tax rate");
+    if (!form.payment_terms.trim()) missing.push("Payment terms");
+    if (!(form.valid_days > 0)) missing.push("Quotation validity period");
     if (!form.line_items.length) missing.push("At least one commercial line item");
     form.line_items.forEach((item, index) => {
       if (!item.description.trim()) missing.push(`Line ${index + 1}: description`);
