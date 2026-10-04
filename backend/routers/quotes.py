@@ -31,7 +31,7 @@ def build_quote(payload: QuoteCreate) -> Quote:
         base_cost = base_line_value(item, item.cost_rate)
         cost_addon_percent = 11 if item.cost_addon_type == "local_tax" else 14 if item.cost_addon_type == "import_tax" else item.cost_addon_percent if item.cost_addon_type == "custom" else 0
         cost_addon_amount = round(base_cost * cost_addon_percent / 100, 2)
-        if item.price_method == "margin":
+        if payload.builder_mode == "margin_calculator" and item.price_method == "margin":
             base_total = (base_cost + cost_addon_amount) / (1 - item.target_margin_percent / 100)
         line_total = base_total + commission_allocation
         line_cost = base_cost + cost_addon_amount
@@ -53,11 +53,13 @@ def build_quote(payload: QuoteCreate) -> Quote:
         )
 
     subtotal = round(subtotal, 2)
-    total_cost = round(total_cost, 2)
+    item_price_subtotal = round(subtotal - payload.commission_amount, 2)
+    total_cost = round(payload.overall_cost if payload.builder_mode == "quote_only" else total_cost, 2)
     tax_amount = round(subtotal * payload.tax_rate / 100, 2) if payload.tax_enabled else 0
     grand_total = round(subtotal + tax_amount, 2)
-    gross_profit = round(subtotal - total_cost, 2)
-    margin_percent = round((gross_profit / subtotal) * 100, 1) if subtotal else 0
+    margin_revenue = item_price_subtotal if payload.builder_mode == "quote_only" else subtotal
+    gross_profit = round(margin_revenue - total_cost, 2)
+    margin_percent = round((gross_profit / margin_revenue) * 100, 1) if margin_revenue else 0
 
     release_date = payload.release_date or today_iso()
     quote_number = payload.quote_number.strip() or f"Q-{datetime.now(timezone.utc).strftime('%Y')}-{datetime.now(timezone.utc).strftime('%m%d')}-{datetime.now(timezone.utc).strftime('%H%M%S')}"

@@ -3,6 +3,7 @@ export type ChargeType = "daily" | "lump_sum";
 export type SalesPricing = "unit" | "line_total";
 export type PriceMethod = "sell_rate" | "margin";
 export type CostAddonType = "none" | "local_tax" | "import_tax" | "custom";
+export type BuilderMode = "margin_calculator" | "quote_only";
 
 export interface QuoteLineItemInput {
   description: string;
@@ -32,6 +33,8 @@ export interface QuoteLineItem extends QuoteLineItemInput {
 }
 
 export interface QuotePayload {
+  builder_mode: BuilderMode;
+  overall_cost: number;
   quote_number: string;
   release_date: string;
   client_name: string;

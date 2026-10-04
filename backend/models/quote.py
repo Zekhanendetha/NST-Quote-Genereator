@@ -10,6 +10,7 @@ ChargeType = Literal["daily", "lump_sum"]
 SalesPricing = Literal["unit", "line_total"]
 PriceMethod = Literal["sell_rate", "margin"]
 CostAddonType = Literal["none", "local_tax", "import_tax", "custom"]
+BuilderMode = Literal["margin_calculator", "quote_only"]
 
 
 class QuoteLineItemInput(BaseModel):
@@ -30,6 +31,8 @@ class QuoteLineItemInput(BaseModel):
 
 
 class QuoteCreate(BaseModel):
+    builder_mode: BuilderMode = "margin_calculator"
+    overall_cost: float = Field(default=0, ge=0)
     quote_number: str = Field(default="", max_length=80)
     release_date: str = Field(default="", max_length=10)
     client_name: str = Field(min_length=1)
@@ -114,6 +117,8 @@ class Quote(BaseModel):
     margin_percent: float
     commission_amount: float = 0
     commission_per_line: float = 0
+    builder_mode: BuilderMode = "margin_calculator"
+    overall_cost: float = 0
 
 
 class QuoteStatusUpdate(BaseModel):
