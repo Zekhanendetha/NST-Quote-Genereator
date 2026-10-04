@@ -74,6 +74,15 @@ export interface Quote extends QuotePayload {
   commission_per_line: number;
 }
 
+export interface CompanyProfile {
+  id: string;
+  company_name: string;
+  company_address: string;
+  company_email: string;
+  company_phone: string;
+  company_logo: string;
+}
+
 export const CURRENCIES = ["USD", "IDR", "EUR", "GBP", "AED", "SAR", "SGD", "MYR", "AUD", "CAD", "JPY", "CNY", "QAR", "KWD", "NGN"];
 export const CATEGORY_LABELS: Record<LineCategory, string> = {
   sales: "Sales",

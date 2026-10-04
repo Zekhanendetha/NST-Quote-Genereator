@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ChangeEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Calculator, Check, ChevronRight, FileText, ImagePlus, Plus, Printer, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Calculator, Check, ChevronRight, FileText, Plus, Printer, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiPut } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { CURRENCIES, CATEGORY_LABELS, formatMoney, type ChargeType, type LineCategory, type PriceMethod, type Quote, type QuoteLineItemInput, type QuotePayload, type SalesPricing } from "@/lib/types";
+import { CURRENCIES, CATEGORY_LABELS, formatMoney, type ChargeType, type CompanyProfile, type LineCategory, type PriceMethod, type Quote, type QuoteLineItemInput, type QuotePayload, type SalesPricing } from "@/lib/types";
 
 const emptyItem = (): QuoteLineItemInput => ({ description: "", description_details: "", category: "service", charge_type: "daily", sales_pricing: "unit", uom: "day", quantity: 1, duration_days: 1, price_method: "sell_rate", sell_rate: 0, target_margin_percent: 0, cost_rate: 0, cost_addon_percent: 0 });
-const initialForm: QuotePayload = { quote_number: "", release_date: "", client_name: "", client_company: "", client_email: "", client_location: "", customer_reference: "", delivery_point: "", company_name: "Your Company Name", company_address: "Business address / registration details", company_email: "commercial@example.com", company_phone: "+000 000 0000", company_logo: "", prepared_by_name: "", prepared_by_title: "", quote_title: "Commercial Quotation", subject: "", currency: "USD", tax_enabled: false, tax_rate: 5, payment_terms: "30 days from invoice", lead_time: "To be confirmed", valid_days: 30, notes: "This quotation is subject to final scope confirmation and availability.", release_notes: "", commission_amount: 0, line_items: [emptyItem()] };
+const initialForm: QuotePayload = { quote_number: "", release_date: "", client_name: "", client_company: "", client_email: "", client_location: "", customer_reference: "", delivery_point: "", company_name: "", company_address: "", company_email: "", company_phone: "", company_logo: "", prepared_by_name: "", prepared_by_title: "", quote_title: "Commercial Quotation", subject: "", currency: "USD", tax_enabled: false, tax_rate: 5, payment_terms: "30 days from invoice", lead_time: "To be confirmed", valid_days: 30, notes: "This quotation is subject to final scope confirmation and availability.", release_notes: "", commission_amount: 0, line_items: [emptyItem()] };
 
 const lineValue = (item: QuoteLineItemInput, rate: number) => item.category === "sales"
   ? (item.sales_pricing === "line_total" ? rate : item.quantity * rate)
@@ -25,6 +25,7 @@ const quotedBaseValue = (item: QuoteLineItemInput) => item.price_method === "mar
   : lineValue(item, item.sell_rate);
 
 const fetchQuote = (id: string) => apiGet<Quote>(`/quotes/${id}`);
+const fetchCompanyProfile = () => apiGet<CompanyProfile>("/company-profile");
 
 function Field({ label, testId, children, className = "" }: { label: string; testId: string; children: ReactNode; className?: string }) {
   return <label className={`block ${className}`}><span className="data-label mb-2 block text-slate-500">{label}</span><div data-testid={`${testId}-field`}>{children}</div></label>;
@@ -93,18 +94,27 @@ function QuotationLineRow({ item, index, currency, commissionPerLine }: { item: 
 
   return (
     <tr data-testid={`preview-line-item-${index}`} className="border-b border-slate-100 align-top">
-      <td className="py-4 pr-5"><span data-testid={`preview-line-description-${index}`} className="font-semibold">{item.description || "Scope description"}</span>{item.description_details && <span data-testid={`preview-line-details-${index}`} className="mt-1 block whitespace-pre-line text-xs leading-5 text-slate-500">{item.description_details}</span>}</td>
-      <td data-testid={`preview-line-category-${index}`} className="py-4 pr-3"><span className="text-xs font-bold uppercase tracking-wider text-slate-700">{CATEGORY_LABELS[item.category]}</span><span className="mt-1 block text-[10px] uppercase tracking-wider text-slate-400">{basis}</span></td>
-      <td data-testid={`preview-line-quantity-${index}`} className="py-4 text-right font-mono text-xs">{item.quantity}</td>
-      <td data-testid={`preview-line-uom-${index}`} className="py-4 text-right text-xs"><span className="uppercase">{item.uom}</span>{item.category !== "sales" && item.charge_type === "daily" && <span className="mt-1 block text-[10px] text-slate-400">{item.duration_days} day{item.duration_days === 1 ? "" : "s"}</span>}</td>
-      <td data-testid={`preview-line-item-price-${index}`} className="py-4 pl-3 text-right font-mono text-xs">{formatMoney(itemPrice, currency)}</td>
-      <td data-testid={`preview-line-amount-${index}`} className="py-4 pl-3 text-right font-mono text-sm font-semibold">{formatMoney(lineTotal, currency)}</td>
+      <td className="py-2.5 pr-5"><span data-testid={`preview-line-description-${index}`} className="font-semibold">{item.description || "Scope description"}</span>{item.description_details && <span data-testid={`preview-line-details-${index}`} className="mt-1 block whitespace-pre-line text-[10px] leading-4 text-slate-500">{item.description_details}</span>}</td>
+      <td data-testid={`preview-line-category-${index}`} className="py-2.5 pr-3"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-700">{CATEGORY_LABELS[item.category]}</span><span className="mt-1 block text-[9px] uppercase tracking-wider text-slate-400">{basis}</span></td>
+      <td data-testid={`preview-line-quantity-${index}`} className="py-2.5 text-right font-mono text-[10px]">{item.quantity}</td>
+      <td data-testid={`preview-line-uom-${index}`} className="py-2.5 text-right text-[10px]"><span className="uppercase">{item.uom}</span>{item.category !== "sales" && item.charge_type === "daily" && <span className="mt-1 block text-[9px] text-slate-400">{item.duration_days} day{item.duration_days === 1 ? "" : "s"}</span>}</td>
+      <td data-testid={`preview-line-item-price-${index}`} className="py-2.5 pl-3 text-right font-mono text-[10px]">{formatMoney(itemPrice, currency)}</td>
+      <td data-testid={`preview-line-amount-${index}`} className="py-2.5 pl-3 text-right font-mono text-xs font-semibold">{formatMoney(lineTotal, currency)}</td>
     </tr>
   );
 }
 
-function DocumentLogo({ logo, companyName }: { logo: string; companyName: string }) {
-  return <div className="flex min-h-20 items-start justify-center border-b border-slate-100 pb-5">{logo && <img data-testid="preview-company-logo" src={logo} alt={`${companyName} logo`} className="h-16 max-w-[220px] object-contain" />}</div>;
+function DocumentLogo({ logo, companyName, testId }: { logo: string; companyName: string; testId: string }) {
+  return <div className="flex min-h-14 items-start justify-center border-b border-slate-100 pb-3">{logo && <img data-testid={testId} src={logo} alt={`${companyName} logo`} className="h-12 max-w-[190px] object-contain" />}</div>;
+}
+
+function DocumentHeader({ form, reference, releaseDate, prefix }: { form: QuotePayload; reference: string; releaseDate: string; prefix: string }) {
+  return (
+    <>
+      <DocumentLogo logo={form.company_logo} companyName={form.company_name} testId={`${prefix}-company-logo`} />
+      <div className="border-b-4 border-orange-600 py-4"><div className="flex items-start justify-between gap-6"><div><p className="data-label text-orange-600">{form.company_name || "Company Name"}</p><h2 data-testid={`${prefix}-quote-title`} className="mt-2 font-heading text-2xl font-bold tracking-tight">{form.quote_title}</h2><p data-testid={`${prefix}-subject`} className="mt-1.5 max-w-md text-xs leading-5 text-slate-600">{form.subject || "Quotation subject"}</p></div><div className="min-w-[170px] text-right"><p data-testid={`${prefix}-confidential`} className="data-label text-red-700">Confidential</p><p className="mt-1.5 data-label">Commercial offer</p><p data-testid={`${prefix}-quote-reference`} className="mt-1.5 font-mono text-xs font-bold">{reference}</p><p data-testid={`${prefix}-release-date`} className="mt-1.5 text-[10px] text-slate-500">Release date: <span className="font-semibold text-slate-700">{releaseDate}</span></p><p className="mt-1 text-[10px] text-slate-500">Validity: {form.valid_days} days</p></div></div></div>
+    </>
+  );
 }
 
 export default function QuoteBuilder() {
@@ -114,6 +124,7 @@ export default function QuoteBuilder() {
   const [form, setForm] = useState<QuotePayload>(initialForm);
   const [isPrinting, setIsPrinting] = useState(false);
   const quoteQuery = useQuery({ queryKey: ["quote", id], queryFn: () => fetchQuote(id as string), enabled: Boolean(id), retry: false });
+  const profileQuery = useQuery({ queryKey: ["company-profile"], queryFn: fetchCompanyProfile, retry: false });
 
   useEffect(() => {
     if (quoteQuery.data) {
@@ -121,6 +132,13 @@ export default function QuoteBuilder() {
       setForm({ ...saved, line_items: saved.line_items.map(({ id: _id, line_total: _total, line_cost: _cost, base_total: _baseTotal, base_cost: _baseCost, cost_addon_amount: _addon, commission_allocation: _commission, ...item }) => item) });
     }
   }, [quoteQuery.data]);
+
+  useEffect(() => {
+    if (!id && profileQuery.data) {
+      const profile = profileQuery.data;
+      setForm((current) => ({ ...current, company_name: profile.company_name, company_address: profile.company_address, company_email: profile.company_email, company_phone: profile.company_phone, company_logo: profile.company_logo }));
+    }
+  }, [id, profileQuery.data]);
 
   const totals = useMemo(() => {
     const baseSubtotal = form.line_items.reduce((sum, item) => sum + quotedBaseValue(item), 0);
@@ -131,21 +149,13 @@ export default function QuoteBuilder() {
     const profit = subtotal - cost;
     return { subtotal, baseSubtotal, cost, tax, total: subtotal + tax, profit, margin: subtotal ? profit / subtotal * 100 : 0, commissionPerLine };
   }, [form]);
+  const documentReference = form.quote_number || quoteQuery.data?.quote_number || "DRAFT / PREVIEW";
+  const documentReleaseDate = form.release_date || quoteQuery.data?.release_date || quoteQuery.data?.issue_date || "Select date";
 
   const updateForm = <K extends keyof QuotePayload>(key: K, value: QuotePayload[K]) => setForm((current) => ({ ...current, [key]: value }));
   const updateItem = (index: number, key: keyof QuoteLineItemInput, value: string | number) => setForm((current) => ({ ...current, line_items: current.line_items.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item) }));
   const addItem = () => setForm((current) => ({ ...current, line_items: [...current.line_items, emptyItem()] }));
   const removeItem = (index: number) => setForm((current) => ({ ...current, line_items: current.line_items.filter((_, itemIndex) => itemIndex !== index) }));
-  const uploadLogo = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) { toast.error("Choose a PNG, JPG, or WebP image."); return; }
-    if (file.size > 1_000_000) { toast.error("Logo must be smaller than 1 MB."); return; }
-    const reader = new FileReader();
-    reader.onload = () => updateForm("company_logo", String(reader.result ?? ""));
-    reader.readAsDataURL(file);
-  };
-
   const saveMutation = useMutation({
     mutationFn: () => id ? apiPut<Quote>(`/quotes/${id}`, form) : apiPost<Quote>("/quotes", form),
     onSuccess: (saved) => { queryClient.invalidateQueries({ queryKey: ["quotes"] }); queryClient.setQueryData(["quote", saved.id], saved); toast.success("Quote saved to your release history"); navigate(`/quotes/${saved.id}`, { replace: true }); },
@@ -157,10 +167,11 @@ export default function QuoteBuilder() {
 
   return (
     <div className="min-h-svh bg-[#f4f4f5] text-slate-950">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur-xl print:hidden"><div className="mx-auto flex max-w-[1500px] items-center justify-between px-5 py-4 lg:px-8"><div className="flex items-center gap-4"><Link to="/" data-testid="builder-back-button" className="grid h-9 w-9 place-items-center border border-slate-200 text-slate-500 transition-colors hover:border-orange-500 hover:text-orange-600"><ArrowLeft size={16} /></Link><div><p className="data-label text-orange-600">Commercial release desk</p><h1 data-testid="builder-heading" className="mt-1 font-heading text-xl font-bold tracking-tight">{id ? "Edit quotation" : "New quotation"}</h1></div></div><div className="flex items-center gap-2"><span data-testid="builder-draft-status" className="hidden text-xs text-slate-500 sm:block">{id ? "Saved record" : "Unsaved draft"}</span><Button data-testid="builder-preview-button" onClick={printQuote} variant="outline" size="sm" className="rounded-none border-slate-300"><Printer size={15} /> Print / PDF</Button><Button data-testid="builder-save-button" onClick={() => saveMutation.mutate()} disabled={!canSave || saveMutation.isPending} size="sm" className="rounded-none bg-orange-600 px-4 text-white hover:bg-orange-700"><Save size={15} /> {saveMutation.isPending ? "Saving…" : "Save quote"}</Button></div></div></header>
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur-xl print:hidden"><div className="mx-auto flex max-w-[1500px] items-center justify-between px-5 py-4 lg:px-8"><div className="flex items-center gap-4"><Link to="/" data-testid="builder-back-button" className="grid h-9 w-9 place-items-center border border-slate-200 text-slate-500 transition-colors hover:border-orange-500 hover:text-orange-600"><ArrowLeft size={16} /></Link><div><p className="data-label text-orange-600">NASAKTION / Quote Generator</p><h1 data-testid="builder-heading" className="mt-1 font-heading text-xl font-bold tracking-tight">{id ? "Edit quotation" : "New quotation"}</h1></div></div><div className="flex items-center gap-2"><span data-testid="builder-draft-status" className="hidden text-xs text-slate-500 sm:block">{id ? "Saved record" : "Unsaved draft"}</span><Button data-testid="builder-preview-button" onClick={printQuote} variant="outline" size="sm" className="rounded-none border-slate-300"><Printer size={15} /> Print / PDF</Button><Button data-testid="builder-save-button" onClick={() => saveMutation.mutate()} disabled={!canSave || saveMutation.isPending} size="sm" className="rounded-none bg-orange-600 px-4 text-white hover:bg-orange-700"><Save size={15} /> {saveMutation.isPending ? "Saving…" : "Save quote"}</Button></div></div></header>
 
       <main className="mx-auto max-w-[1500px] px-5 py-7 lg:px-8 lg:py-9">
         <div className="mb-7 flex items-center gap-2 text-xs text-slate-500 print:hidden"><Link to="/" className="hover:text-orange-600">Workspace</Link><ChevronRight size={14} /><span className="font-semibold text-slate-700">Quote builder</span></div>
+        {!id && !form.company_name && !profileQuery.isLoading && <div data-testid="builder-company-profile-warning" className="mb-6 flex flex-col justify-between gap-3 border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900 sm:flex-row sm:items-center"><span>Set your legal company identity in Workspace before saving this quotation.</span><Link to="/" className="font-bold underline underline-offset-4">Open Workspace</Link></div>}
         {quoteQuery.isError && <div data-testid="builder-load-error" className="mb-5 border border-orange-200 bg-orange-50 p-4 text-sm text-orange-800 print:hidden">This saved quote could not be loaded. Start a new working copy from the dashboard.</div>}
         <div className="grid grid-cols-1 gap-7 lg:grid-cols-12">
           <div className="space-y-7 lg:col-span-8">
@@ -183,17 +194,10 @@ export default function QuoteBuilder() {
 
             <section className="border border-slate-200 bg-white p-6 print:hidden">
               <p className="data-label text-orange-600">Document identity</p>
-              <h2 data-testid="company-section-heading" className="mt-2 font-heading text-xl font-bold tracking-tight">Your quotation page</h2>
-              <p className="mt-2 text-sm text-slate-500">Brand the document and define who prepared this commercial release.</p>
+              <h2 data-testid="company-section-heading" className="mt-2 font-heading text-xl font-bold tracking-tight">Quote-specific details</h2>
+              <p className="mt-2 text-sm text-slate-500">Company branding is managed once from Workspace.</p>
               <div className="mt-5 space-y-4">
-                <div className="border border-dashed border-slate-300 bg-slate-50 p-4">
-                  <p className="data-label mb-3 text-slate-500">Company logo</p>
-                  {form.company_logo ? <div className="flex items-center justify-between gap-4"><img data-testid="company-logo-preview" src={form.company_logo} alt="Company logo preview" className="h-16 max-w-[180px] object-contain object-left" /><button type="button" data-testid="remove-company-logo-button" onClick={() => updateForm("company_logo", "")} className="p-2 text-slate-400 hover:text-red-600" aria-label="Remove company logo"><Trash2 size={16} /></button></div> : <label data-testid="company-logo-upload-label" className="flex cursor-pointer items-center gap-3 text-sm text-slate-600 hover:text-orange-700"><span className="grid h-10 w-10 place-items-center border border-slate-200 bg-white"><ImagePlus size={18} /></span><span>Upload PNG, JPG, or WebP<br /><span className="text-xs text-slate-400">Maximum 1 MB</span></span><input data-testid="company-logo-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadLogo} className="sr-only" /></label>}
-                </div>
                 <div className="grid grid-cols-2 gap-3"><Field label="Quotation number" testId="quote-number"><TextInput testId="quote-number-input" value={form.quote_number} onChange={(value) => updateForm("quote_number", value)} placeholder="Auto-generated if blank" /></Field><Field label="Release date" testId="release-date"><input data-testid="release-date-input" type="date" value={form.release_date} onChange={(event) => updateForm("release_date", event.target.value)} className="w-full border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></Field></div>
-                <Field label="Company name *" testId="company-name"><TextInput testId="company-name-input" value={form.company_name} onChange={(value) => updateForm("company_name", value)} /></Field>
-                <Field label="Address / registration" testId="company-address"><textarea data-testid="company-address-input" value={form.company_address} onChange={(event) => updateForm("company_address", event.target.value)} rows={2} className="w-full resize-none border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></Field>
-                <div className="grid grid-cols-2 gap-3"><Field label="Email" testId="company-email"><TextInput testId="company-email-input" value={form.company_email} onChange={(value) => updateForm("company_email", value)} /></Field><Field label="Phone" testId="company-phone"><TextInput testId="company-phone-input" value={form.company_phone} onChange={(value) => updateForm("company_phone", value)} /></Field></div>
                 <div className="grid grid-cols-2 gap-3"><Field label="Prepared by" testId="prepared-by-name"><TextInput testId="prepared-by-name-input" value={form.prepared_by_name} onChange={(value) => updateForm("prepared_by_name", value)} placeholder="Full name" /></Field><Field label="Title" testId="prepared-by-title"><TextInput testId="prepared-by-title-input" value={form.prepared_by_title} onChange={(value) => updateForm("prepared_by_title", value)} placeholder="Commercial Manager" /></Field></div>
                 <Field label="Terms / exclusions" testId="quote-notes"><textarea data-testid="quote-notes-input" value={form.notes} onChange={(event) => updateForm("notes", event.target.value)} rows={3} className="w-full resize-none border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></Field>
                 <Field label="Release note" testId="release-notes"><textarea data-testid="release-notes-input" value={form.release_notes} onChange={(event) => updateForm("release_notes", event.target.value)} rows={3} placeholder="Add a message, clarification, or release note for the customer…" className="w-full resize-none border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-slate-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></Field>
@@ -204,40 +208,39 @@ export default function QuoteBuilder() {
           </aside>
         </div>
 
-        <section data-testid="print-preview" className={`quotation-page mx-auto mt-12 min-h-[1120px] max-w-[820px] bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.12)] sm:p-12 ${isPrinting ? "print-document" : "print:hidden"}`}>
-          <DocumentLogo logo={form.company_logo} companyName={form.company_name} />
-          <div className="border-b-4 border-orange-600 py-6"><div className="flex items-start justify-between gap-6"><div><p className="data-label text-orange-600">{form.company_name}</p><h2 data-testid="preview-quote-title" className="mt-3 font-heading text-3xl font-bold tracking-tight">{form.quote_title}</h2><p data-testid="preview-subject" className="mt-2 max-w-md text-sm leading-6 text-slate-600">{form.subject || "Quotation subject"}</p></div><div className="min-w-[180px] text-right"><p data-testid="preview-confidential" className="data-label text-red-700">Confidential</p><p className="mt-2 data-label">Commercial offer</p><p data-testid="preview-quote-reference" className="mt-2 font-mono text-sm font-bold">{form.quote_number || quoteQuery.data?.quote_number || "DRAFT / PREVIEW"}</p><p data-testid="preview-release-date" className="mt-2 text-xs text-slate-500">Release date: <span className="font-semibold text-slate-700">{form.release_date || quoteQuery.data?.release_date || quoteQuery.data?.issue_date || "Select date"}</span></p><p className="mt-1 text-xs text-slate-500">Validity: {form.valid_days} days</p></div></div></div>
-          <div className="grid grid-cols-2 gap-8 border-b border-slate-200 py-6 text-sm"><div><p data-testid="preview-supplier-name" className="font-semibold">{form.company_name}</p><p className="mt-1 whitespace-pre-line text-xs leading-5 text-slate-500">{form.company_address}<br />{form.company_email} · {form.company_phone}</p></div><div><p className="data-label">Customer</p><p data-testid="preview-client-name" className="mt-2 font-semibold">{form.client_company || "Client company"}</p><p className="mt-1 text-xs leading-5 text-slate-500">Attn: {form.client_name || "Client contact"}<br />{form.client_location || "Client location"}<br />{form.client_email || "client@email.com"}{form.customer_reference && <><br />Ref: {form.customer_reference}</>}{form.delivery_point && <><br />Delivery point: {form.delivery_point}</>}</p></div></div>
-          <p data-testid="preview-introduction" className="mt-6 text-sm leading-6 text-slate-600"><strong className="text-slate-800">{form.company_name}</strong> is pleased to submit this quotation proposal regarding “{form.subject || "the stated scope"}” for your consideration and review. This proposal has been prepared based on the scope and requirements discussed and outlines our proposed solution, deliverables, and commercial terms for your evaluation.</p>
-          <table className="mt-6 w-full table-fixed text-left text-sm"><thead><tr className="border-b border-slate-900"><th className="w-[32%] pb-3 data-label">Description</th><th className="w-[14%] pb-3 data-label">Type / basis</th><th className="w-[9%] pb-3 text-right data-label">Qty</th><th className="w-[11%] pb-3 text-right data-label">UoM</th><th className="w-[17%] pb-3 text-right data-label">Item price</th><th className="w-[17%] pb-3 text-right data-label">Line amount</th></tr></thead><tbody>{form.line_items.map((item, index) => <QuotationLineRow key={index} item={item} index={index} currency={form.currency} commissionPerLine={totals.commissionPerLine} />)}</tbody></table>
-          <div className="ml-auto mt-6 max-w-xs space-y-2 text-sm"><div className="flex justify-between"><span className="text-slate-500">Subtotal</span><span className="font-mono">{formatMoney(totals.subtotal, form.currency)}</span></div><div className="flex justify-between"><span className="text-slate-500">Tax</span><span className="font-mono">{formatMoney(totals.tax, form.currency)}</span></div><div className="flex justify-between border-t-2 border-slate-900 pt-3 text-base font-bold"><span>TOTAL</span><span data-testid="preview-total" className="font-mono text-orange-700">{formatMoney(totals.total, form.currency)}</span></div></div>
-          <div className="mt-10 grid grid-cols-2 gap-8 border-t border-slate-200 pt-5 text-xs text-slate-500"><p><span className="font-semibold text-slate-700">Payment:</span> {form.payment_terms}</p><p><span className="font-semibold text-slate-700">Delivery:</span> {form.lead_time}</p></div>
+        <section data-testid="print-preview" className={`quotation-page mx-auto mt-10 max-w-[800px] bg-white p-7 shadow-[0_20px_60px_rgba(15,23,42,0.12)] ${isPrinting ? "print-document" : "print:hidden"}`}>
+          <DocumentHeader form={form} reference={documentReference} releaseDate={documentReleaseDate} prefix="preview" />
+          <div className="grid grid-cols-2 gap-8 border-b border-slate-200 py-4 text-xs"><div><p data-testid="preview-supplier-name" className="font-semibold">{form.company_name || "Company Name"}</p><p className="mt-1 whitespace-pre-line text-[10px] leading-4 text-slate-500">{form.company_address}<br />{form.company_email} · {form.company_phone}</p></div><div><p className="data-label">Customer</p><p data-testid="preview-client-name" className="mt-1.5 font-semibold">{form.client_company || "Client company"}</p><p className="mt-1 text-[10px] leading-4 text-slate-500">Attn: {form.client_name || "Client contact"}<br />{form.client_location || "Client location"}<br />{form.client_email || "client@email.com"}{form.customer_reference && <><br />Ref: {form.customer_reference}</>}{form.delivery_point && <><br />Delivery point: {form.delivery_point}</>}</p></div></div>
+          <p data-testid="preview-introduction" className="mt-4 text-xs leading-5 text-slate-600"><strong className="text-slate-800">{form.company_name || "Company Name"}</strong> is pleased to submit this quotation proposal regarding “{form.subject || "the stated scope"}” for your consideration and review. This proposal has been prepared based on the scope and requirements discussed and outlines our proposed solution, deliverables, and commercial terms for your evaluation.</p>
+          <table className="mt-4 w-full table-fixed text-left text-xs"><thead><tr className="border-b border-slate-900"><th className="w-[32%] pb-2 data-label">Description</th><th className="w-[14%] pb-2 data-label">Type / basis</th><th className="w-[9%] pb-2 text-right data-label">Qty</th><th className="w-[11%] pb-2 text-right data-label">UoM</th><th className="w-[17%] pb-2 text-right data-label">Item price</th><th className="w-[17%] pb-2 text-right data-label">Line amount</th></tr></thead><tbody>{form.line_items.map((item, index) => <QuotationLineRow key={index} item={item} index={index} currency={form.currency} commissionPerLine={totals.commissionPerLine} />)}</tbody></table>
+          <div className="ml-auto mt-4 max-w-[260px] space-y-1.5 text-xs"><div className="flex justify-between"><span className="text-slate-500">Subtotal</span><span className="font-mono">{formatMoney(totals.subtotal, form.currency)}</span></div><div className="flex justify-between"><span className="text-slate-500">Tax</span><span className="font-mono">{formatMoney(totals.tax, form.currency)}</span></div><div className="flex justify-between border-t-2 border-slate-900 pt-2 text-sm font-bold"><span>TOTAL</span><span data-testid="preview-total" className="font-mono text-orange-700">{formatMoney(totals.total, form.currency)}</span></div></div>
+          <div className="mt-6 grid grid-cols-2 gap-8 border-t border-slate-200 pt-4 text-[10px] text-slate-500"><p><span className="font-semibold text-slate-700">Payment:</span> {form.payment_terms}</p><p><span className="font-semibold text-slate-700">Delivery:</span> {form.lead_time}</p></div>
           {form.notes && <p data-testid="preview-notes" className="mt-4 whitespace-pre-line text-xs leading-5 text-slate-400">{form.notes}</p>}
           {form.release_notes && <div data-testid="preview-release-notes" className="mt-5 border-l-2 border-orange-500 bg-orange-50 px-4 py-3"><p className="data-label text-orange-700">Release note</p><p className="mt-2 whitespace-pre-line text-xs leading-5 text-slate-600">{form.release_notes}</p></div>}
-          <div data-testid="preview-signature-block" className="mt-10 w-[48%] border border-slate-300 p-5 text-sm"><p className="font-semibold text-slate-700">Best Regards,</p><p className="mt-2 font-heading text-lg font-bold">{form.company_name}</p><div className="h-20" aria-label="Signature space" /><p data-testid="preview-prepared-by-name" className="border-t border-slate-400 pt-3 font-semibold text-slate-900">{form.prepared_by_name || "Prepared by name"}</p><p data-testid="preview-prepared-by-title" className="mt-1 text-xs text-slate-500">{form.prepared_by_title || "Title"}</p></div>
+          <div data-testid="preview-signature-block" className="mt-6 w-[44%] border border-slate-300 p-4 text-xs"><p className="font-semibold text-slate-700">Best Regards,</p><p className="mt-1.5 font-heading text-base font-bold">{form.company_name || "Company Name"}</p><div className="h-12" aria-label="Signature space" /><p data-testid="preview-prepared-by-name" className="border-t border-slate-400 pt-2 font-semibold text-slate-900">{form.prepared_by_name || "Prepared by name"}</p><p data-testid="preview-prepared-by-title" className="mt-1 text-[10px] text-slate-500">{form.prepared_by_title || "Title"}</p></div>
         </section>
 
-        <section data-testid="terms-page" className={`quotation-page mx-auto mt-10 min-h-[1120px] max-w-[820px] bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.12)] sm:p-12 ${isPrinting ? "print-document" : "print:hidden"}`}>
-          <DocumentLogo logo={form.company_logo} companyName={form.company_name} />
-          <div className="mt-7 flex items-end justify-between border-b-4 border-orange-600 pb-5"><div><p className="data-label text-orange-600">Quotation appendix</p><h2 className="mt-3 font-heading text-3xl font-bold tracking-tight">Quotation Terms and Conditions</h2></div><p className="font-mono text-xs font-semibold">{form.quote_number || quoteQuery.data?.quote_number || "DRAFT / PREVIEW"}</p></div>
-          <div className="mt-8 divide-y divide-slate-200 border-y border-slate-200 text-sm">
-            <div data-testid="terms-price-basis" className="grid grid-cols-[180px_1fr] gap-6 py-5"><p className="data-label text-slate-500">Price Basis</p><p className="leading-6 text-slate-700">All prices are quoted in <strong>{form.currency}</strong> unless otherwise stated.</p></div>
-            <div data-testid="terms-payment" className="grid grid-cols-[180px_1fr] gap-6 py-5"><p className="data-label text-slate-500">Payment Terms</p><p className="whitespace-pre-line leading-6 text-slate-700">{form.payment_terms || "To be mutually agreed and stated in the Purchase Order."}</p></div>
-            <div data-testid="terms-delivery" className="grid grid-cols-[180px_1fr] gap-6 py-5"><p className="data-label text-slate-500">Delivery Lead Time</p><p className="leading-6 text-slate-700">{form.lead_time || "To be confirmed"} after official release of the Purchase Order (PO).</p></div>
-            <div data-testid="terms-scope" className="grid grid-cols-[180px_1fr] gap-6 py-5"><p className="data-label text-slate-500">Scope of Supply</p><p className="leading-6 text-slate-700">As per quotation subject: “{form.subject || "Subject to be confirmed"}”.</p></div>
-            <div data-testid="terms-order-confirmation" className="grid grid-cols-[180px_1fr] gap-6 py-5"><p className="data-label text-slate-500">Order Confirmation</p><p className="leading-6 text-slate-700">The Purchase Order shall be deemed accepted only upon written confirmation by the Seller.</p></div>
-            <div data-testid="terms-change-order" className="grid grid-cols-[180px_1fr] gap-6 py-5"><p className="data-label text-slate-500">Change to Order</p><p className="leading-6 text-slate-700">Any changes to specifications, quantity, or delivery schedule after order confirmation may result in adjustments to price and delivery lead time.</p></div>
+        <section data-testid="terms-page" className={`quotation-page mx-auto mt-8 max-w-[800px] bg-white p-7 shadow-[0_20px_60px_rgba(15,23,42,0.12)] ${isPrinting ? "print-document" : "print:hidden"}`}>
+          <DocumentHeader form={form} reference={documentReference} releaseDate={documentReleaseDate} prefix="terms-header" />
+          <div className="mt-6"><p className="data-label text-orange-600">Quotation appendix</p><h2 className="mt-2 font-heading text-2xl font-bold tracking-tight">Quotation Terms and Conditions</h2></div>
+          <div className="mt-5 divide-y divide-slate-200 border-y border-slate-200 text-xs">
+            <div data-testid="terms-price-basis" className="grid grid-cols-[150px_1fr] gap-5 py-3"><p className="data-label text-slate-500">Price Basis</p><p className="leading-5 text-slate-700">All prices are quoted in <strong>{form.currency}</strong> unless otherwise stated.</p></div>
+            <div data-testid="terms-payment" className="grid grid-cols-[150px_1fr] gap-5 py-3"><p className="data-label text-slate-500">Payment Terms</p><p className="whitespace-pre-line leading-5 text-slate-700">{form.payment_terms || "To be mutually agreed and stated in the Purchase Order."}</p></div>
+            <div data-testid="terms-delivery" className="grid grid-cols-[150px_1fr] gap-5 py-3"><p className="data-label text-slate-500">Delivery Lead Time</p><p className="leading-5 text-slate-700">{form.lead_time || "To be confirmed"} after official release of the Purchase Order (PO).</p></div>
+            <div data-testid="terms-scope" className="grid grid-cols-[150px_1fr] gap-5 py-3"><p className="data-label text-slate-500">Scope of Supply</p><p className="leading-5 text-slate-700">As per quotation subject: “{form.subject || "Subject to be confirmed"}”.</p></div>
+            <div data-testid="terms-order-confirmation" className="grid grid-cols-[150px_1fr] gap-5 py-3"><p className="data-label text-slate-500">Order Confirmation</p><p className="leading-5 text-slate-700">The Purchase Order shall be deemed accepted only upon written confirmation by the Seller.</p></div>
+            <div data-testid="terms-change-order" className="grid grid-cols-[150px_1fr] gap-5 py-3"><p className="data-label text-slate-500">Change to Order</p><p className="leading-5 text-slate-700">Any changes to specifications, quantity, or delivery schedule after order confirmation may result in adjustments to price and delivery lead time.</p></div>
           </div>
-          <p className="mt-10 text-xs leading-5 text-slate-400">These Terms and Conditions form an integral part of quotation {form.quote_number || quoteQuery.data?.quote_number || "DRAFT / PREVIEW"}.</p>
+          <p className="mt-6 text-[10px] leading-4 text-slate-400">These Terms and Conditions form an integral part of quotation {documentReference}.</p>
         </section>
 
-        <section data-testid="acceptance-page" className={`quotation-page mx-auto mt-10 min-h-[1120px] max-w-[820px] bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.12)] sm:p-12 ${isPrinting ? "print-document" : "print:hidden"}`}>
-          <DocumentLogo logo={form.company_logo} companyName={form.company_name} />
-          <div className="mt-7 border-b-4 border-orange-600 pb-5"><p className="data-label text-orange-600">Formal acceptance</p><h2 className="mt-3 font-heading text-3xl font-bold tracking-tight">Customer Acceptance</h2></div>
-          <p data-testid="acceptance-wording" className="mt-10 text-base leading-8 text-slate-700">I hereby acknowledge and agree to the Terms and Conditions contained herein and certify that I am authorized to execute this Quotation. Accordingly, we consider this the only agreement between the Company and ourselves for the specific items outlined in this Quotation.</p>
-          <div className="mt-10 border border-slate-200 p-6"><p className="data-label text-slate-500">For and on Behalf of</p><p data-testid="acceptance-customer-name" className="mt-3 font-heading text-2xl font-bold text-slate-900">{form.client_company || "Customer Name"}</p></div>
-          <div className="mt-14 grid grid-cols-2 gap-x-12 gap-y-14 text-sm"><div><p className="data-label text-slate-400">Name</p><div className="mt-10 border-b border-slate-500" /></div><div><p className="data-label text-slate-400">Designation</p><div className="mt-10 border-b border-slate-500" /></div><div><p className="data-label text-slate-400">Date</p><div className="mt-10 border-b border-slate-500" /></div><div><p className="data-label text-slate-400">Signature</p><div className="mt-10 border-b border-slate-500" /></div></div>
-          <div className="mt-20 border-t border-slate-200 pt-5 text-xs text-slate-400"><p>Quotation reference: <span className="font-mono text-slate-600">{form.quote_number || quoteQuery.data?.quote_number || "DRAFT / PREVIEW"}</span></p><p className="mt-2">Release date: {form.release_date || quoteQuery.data?.release_date || quoteQuery.data?.issue_date || "Select date"}</p></div>
+        <section data-testid="acceptance-page" className={`quotation-page mx-auto mt-8 max-w-[800px] bg-white p-7 shadow-[0_20px_60px_rgba(15,23,42,0.12)] ${isPrinting ? "print-document" : "print:hidden"}`}>
+          <DocumentHeader form={form} reference={documentReference} releaseDate={documentReleaseDate} prefix="acceptance-header" />
+          <div className="mt-6"><p className="data-label text-orange-600">Formal acceptance</p><h2 className="mt-2 font-heading text-2xl font-bold tracking-tight">Customer Acceptance</h2></div>
+          <p data-testid="acceptance-wording" className="mt-6 text-sm leading-6 text-slate-700">I hereby acknowledge and agree to the Terms and Conditions contained herein and certify that I am authorized to execute this Quotation. Accordingly, we consider this the only agreement between the Company and ourselves for the specific items outlined in this Quotation.</p>
+          <div className="mt-6 border border-slate-200 p-4"><p className="data-label text-slate-500">For and on Behalf of</p><p data-testid="acceptance-customer-name" className="mt-2 font-heading text-xl font-bold text-slate-900">{form.client_company || "Customer Name"}</p></div>
+          <div className="mt-8 grid grid-cols-2 gap-x-10 gap-y-8 text-xs"><div><p className="data-label text-slate-400">Name</p><div className="mt-7 border-b border-slate-500" /></div><div><p className="data-label text-slate-400">Designation</p><div className="mt-7 border-b border-slate-500" /></div><div><p className="data-label text-slate-400">Date</p><div className="mt-7 border-b border-slate-500" /></div><div><p className="data-label text-slate-400">Signature</p><div className="mt-7 border-b border-slate-500" /></div></div>
+          <div className="mt-10 border-t border-slate-200 pt-4 text-[10px] text-slate-400"><p>Quotation reference: <span className="font-mono text-slate-600">{documentReference}</span></p><p className="mt-1">Release date: {documentReleaseDate}</p></div>
         </section>
       </main>
     </div>

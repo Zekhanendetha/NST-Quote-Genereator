@@ -7,6 +7,7 @@ import os
 import logging
 from pathlib import Path
 from routers.quotes import router as quotes_router
+from routers.company_profile import router as company_profile_router
 
 
 ROOT_DIR = Path(__file__).parent
@@ -34,10 +35,11 @@ api_router = APIRouter(prefix="/api")
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
 async def root():
-    return {"message": "QuoteForge API ready"}
+    return {"message": "NASAKTION Quote Generator API ready"}
 
 
 api_router.include_router(quotes_router)
+api_router.include_router(company_profile_router)
 
 app.add_middleware(
     CORSMiddleware,

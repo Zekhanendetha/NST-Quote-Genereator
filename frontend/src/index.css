@@ -144,6 +144,14 @@
   .data-label { font-family: 'JetBrains Mono Variable', monospace; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em; line-height: 1.1; text-transform: uppercase; }
 }
 
+.quotation-page {
+  font-size: 0.75rem;
+}
+
+.quotation-page .data-label {
+  font-size: 0.55rem;
+}
+
 @media print {
   @page { size: A4; margin: 12mm; }
   body { background: white !important; }
