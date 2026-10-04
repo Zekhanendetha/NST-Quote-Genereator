@@ -4,6 +4,7 @@ export type SalesPricing = "unit" | "line_total";
 export type PriceMethod = "sell_rate" | "margin";
 export type CostAddonType = "none" | "local_tax" | "import_tax" | "custom";
 export type BuilderMode = "margin_calculator" | "quote_only";
+export type ApprovalMode = "same_as_preparer" | "escalation";
 
 export interface QuoteLineItemInput {
   description: string;
@@ -58,6 +59,9 @@ export interface QuotePayload {
   prepared_by_title: string;
   prepared_by_email: string;
   prepared_by_phone: string;
+  approval_mode: ApprovalMode;
+  approval_name: string;
+  approval_title: string;
   quote_title: string;
   subject: string;
   currency: string;

@@ -11,6 +11,7 @@ SalesPricing = Literal["unit", "line_total"]
 PriceMethod = Literal["sell_rate", "margin"]
 CostAddonType = Literal["none", "local_tax", "import_tax", "custom"]
 BuilderMode = Literal["margin_calculator", "quote_only"]
+ApprovalMode = Literal["same_as_preparer", "escalation"]
 
 
 class TermsClause(BaseModel):
@@ -67,6 +68,9 @@ class QuoteCreate(BaseModel):
     prepared_by_title: str = ""
     prepared_by_email: str = ""
     prepared_by_phone: str = ""
+    approval_mode: ApprovalMode = "same_as_preparer"
+    approval_name: str = ""
+    approval_title: str = ""
     quote_title: str = "Commercial Quotation"
     subject: str = ""
     currency: str = Field(default="USD", min_length=3, max_length=3)
@@ -115,6 +119,9 @@ class Quote(BaseModel):
     prepared_by_title: str = ""
     prepared_by_email: str = ""
     prepared_by_phone: str = ""
+    approval_mode: ApprovalMode = "same_as_preparer"
+    approval_name: str = ""
+    approval_title: str = ""
     quote_title: str
     subject: str = ""
     currency: str
