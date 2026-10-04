@@ -1,0 +1,46 @@
+{
+  "iteration": 2,
+  "summary": "All 4 new print/PDF acceptance criteria exercised via 5 browser check artifacts (one criterion covered by 2 artifacts; one artifact run through the public preview ingress), all passed. No backend test files added (all 4 criteria are print/CSS/PDF behavior with no API surface).",
+  "passed": 5,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "No browser metadata on printed PDF",
+      "name": "print-metadata-suppression-and-pagemargins",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created tscheck quote via API, opened /quotes/{id}, stubbed window.print to capture document.title at invocation time after clicking builder-preview-button: captured title === '' (cleared) and restored afterwards. Parsed the live @page CSSOM rule cssText: @top-left/@top-center/@top-right/@bottom-left/@bottom-right all have content:\"\" (blank, suppressing browser date/title/URL), while @bottom-center content is 'CONFIDENTIAL · Page ' counter(page) ' of ' counter(pages)."
+    },
+    {
+      "criterion": "Header repeats on every overflow page",
+      "name": "print-overflow-header-and-pagination",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created tscheck quote with 42 line items via API. DOM check in print media: 3 .quotation-page sections present, break-after/page-break-after resolves to 'page', print-running-header is visible (display != none) while the in-page .document-page-header inside print-preview is display:none. Rendered the full document via page.pdf() (A4) and parsed it with pypdf: resulting PDF has 6 physical pages; every page's extracted text matches /CONFIDENTIAL/ and a 'Page X of Y' pattern where X increments 1..6 and Y=6 on all pages; overflow line items ('Tscheck overflow line ...') appear on physical pages beyond page 1, proving the repeating header/table carries onto overflow pages."
+    },
+    {
+      "criterion": "Customer document only",
+      "name": "print-hides-editor-shows-document-pages",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created tscheck quote via API and opened it. Under page.emulateMedia('print'): quote-builder-editor, builder-save-button, builder-preview-button, builder-back-button all resolve to hidden (display:none via print:hidden); print-preview, terms-page, and acceptance-page remain visible/rendered with full content."
+    },
+    {
+      "criterion": "Automatic numbering",
+      "name": "print-overflow-header-and-pagination",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Same artifact/run as the overflow-header check above: generated A4 PDF has 6 physical pages and every page's footer text (extracted via pypdf) matches 'CONFIDENTIAL ... Page {n} of 6' with n equal to that page's 1-based index, confirming the CSS page/pages counters drive automatic numbering."
+    },
+    {
+      "criterion": "No browser metadata on printed PDF (public ingress)",
+      "name": "print-metadata-suppression-public-preview",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Ran against public preview URL https://invoice-forge-67.preview.emergentagent.com. Created tscheck quote via API, opened saved quote, stubbed window.print, clicked Print/PDF button: captured document.title === '' at print time; under print media emulation quote-builder-editor is hidden and print-preview remains visible."
+    }
+  ]
+}

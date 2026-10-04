@@ -110,10 +110,10 @@ function DocumentLogo({ logo, companyName, testId }: { logo: string; companyName
 
 function DocumentHeader({ form, reference, releaseDate, prefix }: { form: QuotePayload; reference: string; releaseDate: string; prefix: string }) {
   return (
-    <>
+    <div className="document-page-header">
       <DocumentLogo logo={form.company_logo} companyName={form.company_name} testId={`${prefix}-company-logo`} />
       <div className="border-b-4 border-orange-600 py-4"><div className="flex items-start justify-between gap-6"><div><p className="data-label text-orange-600">{form.company_name || "Company Name"}</p><h2 data-testid={`${prefix}-quote-title`} className="mt-2 font-heading text-2xl font-bold tracking-tight">{form.quote_title}</h2><p data-testid={`${prefix}-subject`} className="mt-1.5 max-w-md text-xs leading-5 text-slate-600">{form.subject || "Quotation subject"}</p></div><div className="min-w-[170px] text-right"><p data-testid={`${prefix}-confidential`} className="data-label text-red-700">Confidential</p><p className="mt-1.5 data-label">Commercial offer</p><p data-testid={`${prefix}-quote-reference`} className="mt-1.5 font-mono text-xs font-bold">{reference}</p><p data-testid={`${prefix}-release-date`} className="mt-1.5 text-[10px] text-slate-500">Release date: <span className="font-semibold text-slate-700">{releaseDate}</span></p><p className="mt-1 text-[10px] text-slate-500">Validity: {form.valid_days} days</p></div></div></div>
-    </>
+    </div>
   );
 }
 
@@ -163,7 +163,7 @@ export default function QuoteBuilder() {
 
   const canSave = form.client_name.trim() && form.client_company.trim() && form.company_name.trim() && (form.currency === "USD" || (form.usd_exchange_rate ?? 0) > 0) && form.line_items.length > 0 && form.line_items.every((item) => item.description.trim() && item.uom.trim());
   const canPrint = Boolean(canSave && form.subject.trim() && form.prepared_by_name.trim() && form.prepared_by_title.trim() && documentReference !== "DRAFT / PREVIEW" && documentReleaseDate !== "Select date");
-  const printQuote = () => { if (!canPrint) { toast.error("Save the quotation and complete its subject, release date, preparer, and title before PDF release."); return; } window.print(); };
+  const printQuote = () => { if (!canPrint) { toast.error("Save the quotation and complete its subject, release date, preparer, and title before PDF release."); return; } const originalTitle = document.title; document.title = ""; window.print(); document.title = originalTitle; };
 
   return (
     <div className="min-h-svh bg-[#f4f4f5] text-slate-950">
@@ -207,6 +207,8 @@ export default function QuoteBuilder() {
             <section data-testid="quote-total-card" className="border border-slate-900 bg-slate-950 p-6 text-white print:hidden"><div className="flex items-center justify-between"><p className="data-label text-slate-400">Client-facing total</p><span className="grid h-8 w-8 place-items-center bg-orange-600"><CircleIcon /></span></div><p data-testid="quote-grand-total" className="mt-5 font-mono text-3xl font-bold tracking-tight">{formatMoney(totals.total, form.currency)}</p><div className="mt-5 space-y-3 border-t border-slate-800 pt-4 text-xs"><div className="flex justify-between text-slate-400"><span>Subtotal</span><span data-testid="quote-subtotal" className="font-mono text-slate-200">{formatMoney(totals.subtotal, form.currency)}</span></div><div className="flex justify-between text-slate-400"><span>Tax {form.tax_enabled ? `(${form.tax_rate}%)` : "(not applied)"}</span><span data-testid="quote-tax" className="font-mono text-slate-200">{formatMoney(totals.tax, form.currency)}</span></div><div className="flex justify-between text-slate-400"><span>Gross profit</span><span data-testid="quote-profit" className="font-mono font-semibold text-orange-300">{formatMoney(totals.profit, form.currency)}</span></div></div></section>
           </aside>
         </div>
+
+        <div data-testid="print-running-header" className="print-running-header"><DocumentHeader form={form} reference={documentReference} releaseDate={documentReleaseDate} prefix="running-header" /></div>
 
         <section data-testid="print-preview" className="quotation-page print-document mx-auto mt-10 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)]">
           <DocumentHeader form={form} reference={documentReference} releaseDate={documentReleaseDate} prefix="preview" />
