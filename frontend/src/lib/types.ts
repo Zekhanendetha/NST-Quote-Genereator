@@ -48,6 +48,7 @@ export interface QuotePayload {
   quote_title: string;
   subject: string;
   currency: string;
+  usd_exchange_rate: number | null;
   tax_enabled: boolean;
   tax_rate: number;
   payment_terms: string;
@@ -61,7 +62,7 @@ export interface QuotePayload {
 
 export interface Quote extends QuotePayload {
   id: string;
-  status: "draft" | "issued";
+  status: QuoteStatus;
   issue_date: string;
   created_at: string;
   line_items: QuoteLineItem[];
@@ -73,6 +74,8 @@ export interface Quote extends QuotePayload {
   margin_percent: number;
   commission_per_line: number;
 }
+
+export type QuoteStatus = "draft" | "issued" | "released" | "cancelled" | "executed" | "partial_executed";
 
 export interface CompanyProfile {
   id: string;

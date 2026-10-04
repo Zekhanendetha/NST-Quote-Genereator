@@ -46,6 +46,7 @@ class QuoteCreate(BaseModel):
     quote_title: str = "Commercial Quotation"
     subject: str = ""
     currency: str = Field(default="USD", min_length=3, max_length=3)
+    usd_exchange_rate: float | None = Field(default=None, gt=0)
     tax_enabled: bool = False
     tax_rate: float = Field(default=0, ge=0, le=100)
     payment_terms: str = "30 days from invoice"
@@ -70,7 +71,7 @@ class QuoteLineItem(QuoteLineItemInput):
 class Quote(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     quote_number: str
-    status: Literal["draft", "issued"] = "draft"
+    status: Literal["draft", "issued", "released", "cancelled", "executed", "partial_executed"] = "draft"
     issue_date: str
     release_date: str = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -90,6 +91,7 @@ class Quote(BaseModel):
     quote_title: str
     subject: str = ""
     currency: str
+    usd_exchange_rate: float | None = None
     tax_enabled: bool
     tax_rate: float
     payment_terms: str
@@ -106,3 +108,7 @@ class Quote(BaseModel):
     margin_percent: float
     commission_amount: float = 0
     commission_per_line: float = 0
+
+
+class QuoteStatusUpdate(BaseModel):
+    status: Literal["draft", "issued", "released", "cancelled", "executed", "partial_executed"]

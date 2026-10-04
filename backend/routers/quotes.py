@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
+from pymongo import ReturnDocument
 
 from lib.db import db
 from lib.dates import today_iso
-from models.quote import Quote, QuoteCreate, QuoteLineItem
+from models.quote import Quote, QuoteCreate, QuoteLineItem, QuoteStatusUpdate
 
 
 router = APIRouter(prefix="/quotes", tags=["quotes"])
@@ -111,6 +112,18 @@ async def get_quote(quote_id: str):
     if not document:
         raise HTTPException(status_code=404, detail="Quote not found")
     return Quote(**document)
+
+
+@router.patch("/{quote_id}/status", response_model=Quote)
+async def update_quote_status(quote_id: str, payload: QuoteStatusUpdate):
+    result = await db.quotes.find_one_and_update(
+        {"id": quote_id},
+        {"$set": {"status": payload.status}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    return Quote(**result)
 
 
 @router.delete("/{quote_id}", status_code=204)

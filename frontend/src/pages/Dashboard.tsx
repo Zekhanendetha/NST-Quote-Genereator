@@ -4,31 +4,40 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Activity, ArrowUpRight, BarChart3, BookOpen, Building2, CircleDollarSign, FilePlus2, ImagePlus, Save, Search, Trash2, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
-import { apiGet, apiPut } from "@/lib/api";
-import { CATEGORY_LABELS, formatMoney, type CompanyProfile, type Quote } from "@/lib/types";
+import { apiDelete, apiGet, apiPatch, apiPut } from "@/lib/api";
+import { CATEGORY_LABELS, formatMoney, type CompanyProfile, type Quote, type QuoteStatus } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const fetchQuotes = () => apiGet<Quote[]>("/quotes");
 const fetchCompanyProfile = () => apiGet<CompanyProfile>("/company-profile");
 const emptyProfile: CompanyProfile = { id: "workspace-company-profile", company_name: "", company_address: "", company_email: "", company_phone: "", company_logo: "" };
+type MetricKey = "revenue" | "cost" | "profit" | "margin";
+const STATUS_LABELS: Record<QuoteStatus, string> = { draft: "Released", issued: "Issued", released: "Released", cancelled: "Cancelled", executed: "Executed", partial_executed: "Partially executed" };
 
-function MetricCard({ label, value, detail, accent = false, icon: Icon }: { label: string; value: string; detail: string; accent?: boolean; icon: typeof TrendingUp }) {
+const quoteUsdRate = (quote: Quote) => quote.currency === "USD" ? 1 : quote.usd_exchange_rate;
+const toUsd = (quote: Quote, amount: number) => { const rate = quoteUsdRate(quote); return rate && rate > 0 ? amount * rate : null; };
+const METRIC_TITLES: Record<MetricKey, string> = { revenue: "Quoted Revenue Detail", cost: "Total Cost Detail", profit: "Gross Profit Detail", margin: "Average Margin Detail" };
+const metricQuoteValue = (quote: Quote, metric: MetricKey) => metric === "margin" ? `${quote.margin_percent.toFixed(1)}%` : (() => { const amount = metric === "revenue" ? quote.grand_total : metric === "cost" ? quote.total_cost : quote.gross_profit; const usd = toUsd(quote, amount); return usd === null ? "FX needed" : formatMoney(usd, "USD"); })();
+
+function MetricCard({ label, value, detail, accent = false, icon: Icon, onClick }: { label: string; value: string; detail: string; accent?: boolean; icon: typeof TrendingUp; onClick: () => void }) {
   return (
-    <div data-testid={`dashboard-metric-${label.toLowerCase().replaceAll(" ", "-")}`} className={`border border-slate-200 p-5 ${accent ? "bg-orange-50" : "bg-white"}`}>
+    <button type="button" onClick={onClick} data-testid={`dashboard-metric-${label.toLowerCase().replaceAll(" ", "-")}`} className={`group w-full border border-slate-200 p-5 text-left transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-md ${accent ? "bg-orange-50" : "bg-white"}`}>
       <div className="flex items-start justify-between">
         <p className="data-label">{label}</p>
         <Icon size={17} className={accent ? "text-orange-600" : "text-slate-400"} aria-hidden="true" />
       </div>
       <p className="mt-5 font-mono text-2xl font-bold tracking-tight text-slate-950">{value}</p>
-      <p className="mt-2 text-xs text-slate-500">{detail}</p>
-    </div>
+      <p className="mt-2 flex items-center justify-between text-xs text-slate-500"><span>{detail}</span><span className="font-semibold text-orange-700 opacity-0 transition-opacity group-hover:opacity-100">View detail →</span></p>
+    </button>
   );
 }
 
 export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [profile, setProfile] = useState<CompanyProfile>(emptyProfile);
+  const [selectedMetric, setSelectedMetric] = useState<MetricKey | null>(null);
   const queryClient = useQueryClient();
   const quotesQuery = useQuery({ queryKey: ["quotes"], queryFn: fetchQuotes, retry: false });
   const profileQuery = useQuery({ queryKey: ["company-profile"], queryFn: fetchCompanyProfile, retry: false });
@@ -37,6 +46,16 @@ export default function Dashboard() {
     mutationFn: () => apiPut<CompanyProfile>("/company-profile", profile),
     onSuccess: (saved) => { setProfile(saved); queryClient.setQueryData(["company-profile"], saved); toast.success("Workspace identity saved"); },
     onError: () => toast.error("Unable to save the Workspace identity."),
+  });
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: QuoteStatus }) => apiPatch<Quote>(`/quotes/${id}/status`, { status }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["quotes"] }); toast.success("Quotation status updated"); },
+    onError: () => toast.error("Unable to update quotation status."),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiDelete<void>(`/quotes/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["quotes"] }); toast.success("Quotation deleted"); },
+    onError: () => toast.error("Unable to delete this quotation."),
   });
   const uploadWorkspaceLogo = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -53,16 +72,25 @@ export default function Dashboard() {
     [quotes, search],
   );
   const totals = useMemo(() => {
-    const revenue = quotes.reduce((sum, quote) => sum + quote.grand_total, 0);
-    const cost = quotes.reduce((sum, quote) => sum + quote.total_cost, 0);
-    const profit = quotes.reduce((sum, quote) => sum + quote.gross_profit, 0);
-    const currencies = new Set(quotes.map((quote) => quote.currency));
-    const margin = currencies.size <= 1 && revenue ? (profit / quotes.reduce((sum, quote) => sum + quote.subtotal, 0)) * 100 : null;
-    const displayCurrency = currencies.size === 1 ? [...currencies][0] : "USD";
-    return { revenue, cost, profit, margin, currencyCount: currencies.size, displayCurrency };
+    let revenue = 0;
+    let subtotal = 0;
+    let cost = 0;
+    let profit = 0;
+    let missingFx = 0;
+    for (const quote of quotes) {
+      const revenueUsd = toUsd(quote, quote.grand_total);
+      const subtotalUsd = toUsd(quote, quote.subtotal);
+      const costUsd = toUsd(quote, quote.total_cost);
+      const profitUsd = toUsd(quote, quote.gross_profit);
+      if (revenueUsd === null || subtotalUsd === null || costUsd === null || profitUsd === null) { missingFx += 1; continue; }
+      revenue += revenueUsd;
+      subtotal += subtotalUsd;
+      cost += costUsd;
+      profit += profitUsd;
+    }
+    return { revenue, cost, profit, margin: subtotal ? profit / subtotal * 100 : 0, missingFx };
   }, [quotes]);
-  const trackedDetail = totals.currencyCount > 1 ? `Across ${totals.currencyCount} currencies` : "Including optional tax";
-  const value = (amount: number) => totals.currencyCount > 1 ? "MULTI" : formatMoney(amount, totals.displayCurrency);
+  const fxDetail = totals.missingFx ? `${totals.missingFx} quote${totals.missingFx === 1 ? "" : "s"} need USD rate` : "All quotations converted to USD";
 
   return (
     <div className="min-h-svh bg-[#f4f4f5] text-slate-950">
@@ -83,17 +111,17 @@ export default function Dashboard() {
         <div className="mb-9 flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div>
             <p className="data-label text-orange-600">Commercial release / overview</p>
-            <h1 data-testid="dashboard-heading" className="mt-3 max-w-2xl font-heading text-4xl font-bold tracking-[-0.055em] text-slate-950 sm:text-5xl">Quote intelligence for the field.</h1>
-            <p data-testid="dashboard-subheading" className="mt-4 max-w-xl text-base leading-7 text-slate-600">Build defensible oil &amp; gas offers, see your margin before release, and keep every client conversation in one place.</p>
+            <h1 data-testid="dashboard-heading" className="mt-3 max-w-2xl font-heading text-4xl font-bold tracking-[-0.055em] text-slate-950 sm:text-5xl">Quote intelligence generator</h1>
+            <p data-testid="dashboard-subheading" className="mt-4 max-w-xl text-base leading-7 text-slate-600">1st Release</p>
           </div>
           <div className="flex items-center gap-2 border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500"><BookOpen size={15} className="text-orange-600" /> {quotes.length} saved {quotes.length === 1 ? "quote" : "quotes"}</div>
         </div>
 
         <section aria-label="Business performance" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard label="Quoted revenue" value={value(totals.revenue)} detail={trackedDetail} icon={CircleDollarSign} />
-          <MetricCard label="Total cost" value={value(totals.cost)} detail={totals.currencyCount > 1 ? "Commercial cost basis" : "Commercial cost basis"} icon={BarChart3} />
-          <MetricCard label="Gross profit" value={value(totals.profit)} detail="Before overhead allocation" accent icon={TrendingUp} />
-          <MetricCard label="Average margin" value={totals.margin === null ? "—" : `${totals.margin.toFixed(1)}%`} detail={totals.currencyCount > 1 ? "Compare within one currency" : "Across saved quotations"} icon={ArrowUpRight} />
+          <MetricCard label="Quoted revenue" value={formatMoney(totals.revenue, "USD")} detail={fxDetail} icon={CircleDollarSign} onClick={() => setSelectedMetric("revenue")} />
+          <MetricCard label="Total cost" value={formatMoney(totals.cost, "USD")} detail={fxDetail} icon={BarChart3} onClick={() => setSelectedMetric("cost")} />
+          <MetricCard label="Gross profit" value={formatMoney(totals.profit, "USD")} detail="USD profit before overhead allocation" accent icon={TrendingUp} onClick={() => setSelectedMetric("profit")} />
+          <MetricCard label="Average margin" value={`${totals.margin.toFixed(1)}%`} detail="Weighted by USD-converted revenue" icon={ArrowUpRight} onClick={() => setSelectedMetric("margin")} />
         </section>
 
         <section data-testid="workspace-company-identity" className="mt-10 border border-slate-200 bg-white">
@@ -111,9 +139,16 @@ export default function Dashboard() {
           </div>
           {quotesQuery.isError && <div data-testid="quote-history-error" className="m-6 border border-orange-200 bg-orange-50 p-4 text-sm text-orange-800">History is temporarily unavailable. You can still open a new quote and continue working.</div>}
           {!quotesQuery.isError && filteredQuotes.length === 0 && <div data-testid="quote-history-empty" className="grid min-h-[230px] place-items-center px-6 py-12 text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center border border-orange-200 bg-orange-50 text-orange-600"><FilePlus2 size={20} /></div><h3 className="mt-4 font-heading text-lg font-semibold">No releases in the database yet</h3><p className="mt-2 text-sm text-slate-500">Start with one quote and your commercial history will appear here.</p><Link to="/quotes/new" data-testid="quote-history-empty-new-button" className={buttonVariants({ variant: "outline", size: "sm" }) + " mt-5 rounded-none border-slate-300"}>Create first quote</Link></div></div>}
-          {filteredQuotes.length > 0 && <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left"><thead><tr className="border-b border-slate-200 bg-slate-50/80"><th className="px-6 py-3 data-label">Reference</th><th className="px-6 py-3 data-label">Client</th><th className="px-6 py-3 data-label">Scope</th><th className="px-6 py-3 data-label">Release value</th><th className="px-6 py-3 data-label">Margin</th><th className="px-6 py-3 data-label">Status</th><th className="px-6 py-3" /></tr></thead><tbody>{filteredQuotes.map((quote, index) => <tr data-testid={`quote-history-row-${quote.id}`} key={quote.id} className="group border-b border-slate-100 transition-colors hover:bg-orange-50/40" style={{ animationDelay: `${index * 50}ms` }}><td className="px-6 py-4"><Link to={`/quotes/${quote.id}`} data-testid={`quote-history-reference-${quote.id}`} className="font-mono text-sm font-bold text-slate-950 hover:text-orange-700">{quote.quote_number}</Link><span className="mt-1 block text-xs text-slate-500">{quote.issue_date}</span></td><td className="px-6 py-4"><span data-testid={`quote-history-client-${quote.id}`} className="block text-sm font-semibold text-slate-800">{quote.client_company}</span><span className="mt-1 block text-xs text-slate-500">{quote.client_name}</span></td><td className="px-6 py-4"><div className="flex flex-wrap gap-1">{Array.from(new Set(quote.line_items.map((item) => item.category))).map((category) => <Badge data-testid={`quote-history-category-${quote.id}-${category}`} key={category} variant="outline" className="rounded-none border-slate-200 text-[10px] uppercase tracking-wider">{CATEGORY_LABELS[category]}</Badge>)}</div></td><td data-testid={`quote-history-total-${quote.id}`} className="px-6 py-4 font-mono text-sm font-semibold">{formatMoney(quote.grand_total, quote.currency)}</td><td data-testid={`quote-history-margin-${quote.id}`} className="px-6 py-4"><span className="bg-orange-50 px-2 py-1 font-mono text-sm font-bold text-orange-700">{quote.margin_percent.toFixed(1)}%</span></td><td className="px-6 py-4"><span data-testid={`quote-history-status-${quote.id}`} className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500"><span className="h-1.5 w-1.5 bg-slate-400" /> {quote.status}</span></td><td className="px-6 py-4 text-right"><Link to={`/quotes/${quote.id}`} data-testid={`quote-history-open-${quote.id}`} className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-orange-700 opacity-70 transition-opacity group-hover:opacity-100">Open <ArrowUpRight size={14} /></Link></td></tr>)}</tbody></table></div>}
+          {filteredQuotes.length > 0 && <div className="overflow-x-auto"><table className="w-full min-w-[1280px] text-left"><thead><tr className="border-b border-slate-200 bg-slate-50/80"><th className="px-5 py-3 data-label">Reference</th><th className="px-5 py-3 data-label">Customer</th><th className="px-5 py-3 data-label">Prepared by</th><th className="px-5 py-3 data-label">Scope</th><th className="px-5 py-3 data-label">Original value</th><th className="px-5 py-3 data-label">USD value</th><th className="px-5 py-3 data-label">Margin</th><th className="px-5 py-3 data-label">Execution status</th><th className="px-5 py-3 data-label">Actions</th></tr></thead><tbody>{filteredQuotes.map((quote, index) => { const usdValue = toUsd(quote, quote.grand_total); return <tr data-testid={`quote-history-row-${quote.id}`} key={quote.id} className="group border-b border-slate-100 transition-colors hover:bg-orange-50/40" style={{ animationDelay: `${index * 50}ms` }}><td className="px-5 py-4"><Link to={`/quotes/${quote.id}`} data-testid={`quote-history-reference-${quote.id}`} className="font-mono text-sm font-bold text-slate-950 hover:text-orange-700">{quote.quote_number}</Link><span className="mt-1 block text-xs text-slate-500">{quote.issue_date}</span></td><td className="px-5 py-4"><span data-testid={`quote-history-client-${quote.id}`} className="block text-sm font-semibold text-slate-800">{quote.client_company}</span><span className="mt-1 block text-xs text-slate-500">{quote.client_name}</span></td><td data-testid={`quote-history-preparer-${quote.id}`} className="px-5 py-4"><span className="block text-sm font-semibold text-slate-700">{quote.prepared_by_name || "—"}</span><span className="mt-1 block text-xs text-slate-500">{quote.prepared_by_title || "No title"}</span></td><td className="px-5 py-4"><div className="flex flex-wrap gap-1">{Array.from(new Set(quote.line_items.map((item) => item.category))).map((category) => <Badge data-testid={`quote-history-category-${quote.id}-${category}`} key={category} variant="outline" className="rounded-none border-slate-200 text-[10px] uppercase tracking-wider">{CATEGORY_LABELS[category]}</Badge>)}</div></td><td data-testid={`quote-history-total-${quote.id}`} className="px-5 py-4 font-mono text-xs font-semibold">{formatMoney(quote.grand_total, quote.currency)}</td><td data-testid={`quote-history-usd-total-${quote.id}`} className="px-5 py-4 font-mono text-xs font-bold text-slate-900">{usdValue === null ? <span className="text-orange-700">FX needed</span> : formatMoney(usdValue, "USD")}</td><td data-testid={`quote-history-margin-${quote.id}`} className="px-5 py-4"><span className="bg-orange-50 px-2 py-1 font-mono text-xs font-bold text-orange-700">{quote.margin_percent.toFixed(1)}%</span></td><td className="px-5 py-4"><select data-testid={`quote-history-status-select-${quote.id}`} value={quote.status} onChange={(event) => statusMutation.mutate({ id: quote.id, status: event.target.value as QuoteStatus })} className="min-w-[150px] border-2 border-slate-300 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100">{(["draft", "issued", "released", "partial_executed", "executed", "cancelled"] as QuoteStatus[]).map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select></td><td className="px-5 py-4"><div className="flex items-center gap-3"><Link to={`/quotes/${quote.id}`} data-testid={`quote-history-open-${quote.id}`} className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-orange-700">Open <ArrowUpRight size={14} /></Link><button type="button" data-testid={`quote-history-delete-${quote.id}`} onClick={() => { if (window.confirm(`Delete quotation ${quote.quote_number}? This cannot be undone.`)) deleteMutation.mutate(quote.id); }} className="text-xs font-bold uppercase tracking-wider text-red-600 hover:text-red-800">Delete</button></div></td></tr>; })}</tbody></table></div>}
         </section>
         <p data-testid="dashboard-footer-note" className="mt-6 text-xs text-slate-400">All values are working commercial estimates. Review cost basis, tax treatment, and client terms before release.</p>
+
+        <Dialog open={selectedMetric !== null} onOpenChange={(open) => { if (!open) setSelectedMetric(null); }}>
+          <DialogContent data-testid="metric-detail-dialog" className="max-h-[82vh] max-w-5xl overflow-y-auto rounded-none">
+            <DialogHeader><DialogTitle>{selectedMetric ? METRIC_TITLES[selectedMetric] : "Quotation Detail"}</DialogTitle><DialogDescription>All released quotations are listed in their saved currency and converted USD basis. Missing manual rates are highlighted.</DialogDescription></DialogHeader>
+            <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[760px] text-left"><thead><tr className="border-b border-slate-200 bg-slate-50"><th className="px-4 py-3 data-label">Reference</th><th className="px-4 py-3 data-label">Customer</th><th className="px-4 py-3 data-label">Preparer</th><th className="px-4 py-3 data-label">Status</th><th className="px-4 py-3 data-label">Original value</th><th className="px-4 py-3 text-right data-label">{selectedMetric === "margin" ? "Margin" : "USD value"}</th></tr></thead><tbody>{quotes.map((quote) => <tr data-testid={`metric-detail-row-${quote.id}`} key={quote.id} className="border-b border-slate-100"><td className="px-4 py-3 font-mono text-xs font-bold">{quote.quote_number}</td><td className="px-4 py-3 text-sm">{quote.client_company}</td><td className="px-4 py-3 text-sm">{quote.prepared_by_name || "—"}</td><td className="px-4 py-3 text-xs font-semibold uppercase tracking-wide">{STATUS_LABELS[quote.status]}</td><td className="px-4 py-3 font-mono text-xs">{formatMoney(quote.grand_total, quote.currency)}</td><td data-testid={`metric-detail-value-${quote.id}`} className="px-4 py-3 text-right font-mono text-sm font-bold text-orange-700">{selectedMetric ? metricQuoteValue(quote, selectedMetric) : "—"}</td></tr>)}</tbody></table></div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
