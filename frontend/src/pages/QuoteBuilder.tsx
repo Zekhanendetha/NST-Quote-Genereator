@@ -6,6 +6,7 @@ import { ArrowLeft, Calculator, Check, ChevronRight, Download, FileText, Plus, P
 import { toast } from "sonner";
 import { apiGet, apiPost, apiPut } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { generateQuotePdf } from "@/lib/generateQuotePdf";
 import { CURRENCIES, CATEGORY_LABELS, formatMoney, type ChargeType, type CompanyProfile, type LineCategory, type PriceMethod, type Quote, type QuoteLineItemInput, type QuotePayload, type SalesPricing } from "@/lib/types";
 
@@ -205,6 +206,7 @@ export default function QuoteBuilder() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<QuotePayload>(initialForm);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [missingFieldsOpen, setMissingFieldsOpen] = useState(false);
   const quoteQuery = useQuery({ queryKey: ["quote", id], queryFn: () => fetchQuote(id as string), enabled: Boolean(id), retry: false });
   const profileQuery = useQuery({ queryKey: ["company-profile"], queryFn: fetchCompanyProfile, retry: false });
 
@@ -235,6 +237,26 @@ export default function QuoteBuilder() {
   const documentPageCount = commercialPages.length + 3;
   const documentReference = form.quote_number || quoteQuery.data?.quote_number || "DRAFT / PREVIEW";
   const documentReleaseDate = form.release_date || quoteQuery.data?.release_date || quoteQuery.data?.issue_date || "Select date";
+  const missingReleaseFields = useMemo(() => {
+    const missing: string[] = [];
+    if (!id) missing.push("Save the quotation before release");
+    if (!form.company_name.trim()) missing.push("Workspace legal company name");
+    if (!form.client_name.trim()) missing.push("Customer contact name");
+    if (!form.client_company.trim()) missing.push("Customer company name");
+    if (!form.subject.trim()) missing.push("Quotation subject");
+    if (!form.release_date && !quoteQuery.data?.release_date && !quoteQuery.data?.issue_date) missing.push("Release date");
+    if (!form.prepared_by_name.trim()) missing.push("Preparer name");
+    if (!form.prepared_by_title.trim()) missing.push("Preparer designation");
+    if (!form.prepared_by_email.trim()) missing.push("Preparer email address");
+    if (!form.prepared_by_phone.trim()) missing.push("Preparer phone number");
+    if (form.currency !== "USD" && !(form.usd_exchange_rate && form.usd_exchange_rate > 0)) missing.push(`USD conversion rate for ${form.currency}`);
+    if (!form.line_items.length) missing.push("At least one commercial line item");
+    form.line_items.forEach((item, index) => {
+      if (!item.description.trim()) missing.push(`Line ${index + 1}: description`);
+      if (!item.uom.trim()) missing.push(`Line ${index + 1}: unit of measure`);
+    });
+    return missing;
+  }, [form, id, quoteQuery.data?.issue_date, quoteQuery.data?.release_date]);
 
   const updateForm = <K extends keyof QuotePayload>(key: K, value: QuotePayload[K]) => setForm((current) => ({ ...current, [key]: value }));
   const updateItem = (index: number, key: keyof QuoteLineItemInput, value: string | number) => setForm((current) => ({ ...current, line_items: current.line_items.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item) }));
@@ -247,13 +269,13 @@ export default function QuoteBuilder() {
   });
 
   const canSave = form.client_name.trim() && form.client_company.trim() && form.company_name.trim() && (form.currency === "USD" || (form.usd_exchange_rate ?? 0) > 0) && form.line_items.length > 0 && form.line_items.every((item) => item.description.trim() && item.uom.trim());
-  const canPrint = Boolean(canSave && form.subject.trim() && form.prepared_by_name.trim() && form.prepared_by_title.trim() && form.prepared_by_email.trim() && form.prepared_by_phone.trim() && documentReference !== "DRAFT / PREVIEW" && documentReleaseDate !== "Select date");
+  const canPrint = missingReleaseFields.length === 0;
   const printQuote = () => { if (!canPrint) { toast.error("Save the quotation and complete subject, release date, and all preparer contact fields before PDF release."); return; } const originalTitle = document.title; document.title = ""; window.print(); document.title = originalTitle; };
-  const downloadPdf = async () => { if (!canPrint) { toast.error("Save the quotation and complete subject, release date, and all preparer contact fields before downloading PDF."); return; } setIsDownloading(true); try { const pages = Array.from(document.querySelectorAll<HTMLElement>("[data-pdf-page='true']")); const filename = await generateQuotePdf({ pages, quoteNumber: documentReference, subject: form.subject, companyName: form.company_name }); toast.success(`Downloaded ${filename}`); } catch { toast.error("Unable to generate the PDF. Please try Print / PDF instead."); } finally { setIsDownloading(false); } };
+  const downloadPdf = async () => { if (missingReleaseFields.length) { setMissingFieldsOpen(true); return; } setIsDownloading(true); try { const pages = Array.from(document.querySelectorAll<HTMLElement>("[data-pdf-page='true']")); const filename = await generateQuotePdf({ pages, quoteNumber: documentReference, subject: form.subject, companyName: form.company_name }); toast.success(`Downloaded ${filename}`); } catch { toast.error("Unable to generate the PDF. Please try Print / PDF instead."); } finally { setIsDownloading(false); } };
 
   return (
     <div className="min-h-svh bg-[#f4f4f5] text-slate-950">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur-xl print:hidden"><div className="mx-auto flex max-w-[1500px] items-center justify-between px-5 py-4 lg:px-8"><div className="flex items-center gap-4"><Link to="/" data-testid="builder-back-button" className="grid h-9 w-9 place-items-center border border-slate-200 text-slate-500 transition-colors hover:border-orange-500 hover:text-orange-600"><ArrowLeft size={16} /></Link><div><p className="data-label text-orange-600">NASAKTION / Quote Generator</p><h1 data-testid="builder-heading" className="mt-1 font-heading text-xl font-bold tracking-tight">{id ? "Edit quotation" : "New quotation"}</h1></div></div><div className="flex items-center gap-2"><span data-testid="builder-draft-status" className="hidden text-xs text-slate-500 sm:block">{id ? "Saved record" : "Unsaved draft"}</span>{id && quoteQuery.isLoading ? <Button disabled size="sm" className="rounded-none bg-slate-900 text-white"><Download size={15} /> Loading quote…</Button> : <Button data-testid="builder-download-pdf-button" onClick={downloadPdf} disabled={!canPrint || isDownloading} title={canPrint ? "Download the customer release PDF" : "Save and complete release details first"} size="sm" className="rounded-none bg-slate-900 text-white hover:bg-slate-800"><Download size={15} /> {isDownloading ? "Generating…" : "Download PDF"}</Button>}<Button data-testid="builder-preview-button" onClick={printQuote} disabled={!canPrint} title={canPrint ? "Print or save the customer release as PDF" : "Save and complete release details first"} variant="outline" size="sm" className="rounded-none border-slate-300"><Printer size={15} /> Print / PDF</Button><Button data-testid="builder-save-button" onClick={() => saveMutation.mutate()} disabled={!canSave || saveMutation.isPending} size="sm" className="rounded-none bg-orange-600 px-4 text-white hover:bg-orange-700"><Save size={15} /> {saveMutation.isPending ? "Saving…" : "Save quote"}</Button></div></div></header>
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur-xl print:hidden"><div className="mx-auto flex max-w-[1500px] items-center justify-between px-5 py-4 lg:px-8"><div className="flex items-center gap-4"><Link to="/" data-testid="builder-back-button" className="grid h-9 w-9 place-items-center border border-slate-200 text-slate-500 transition-colors hover:border-orange-500 hover:text-orange-600"><ArrowLeft size={16} /></Link><div><p className="data-label text-orange-600">NASAKTION / Quote Generator</p><h1 data-testid="builder-heading" className="mt-1 font-heading text-xl font-bold tracking-tight">{id ? "Edit quotation" : "New quotation"}</h1></div></div><div className="flex items-center gap-2"><span data-testid="builder-draft-status" className="hidden text-xs text-slate-500 sm:block">{id ? "Saved record" : "Unsaved draft"}</span>{id && quoteQuery.isLoading ? <Button disabled size="sm" className="rounded-none bg-slate-900 text-white"><Download size={15} /> Loading quote…</Button> : <Button data-testid="builder-download-pdf-button" onClick={downloadPdf} disabled={isDownloading} title={canPrint ? "Download the customer release PDF" : "Review missing release data"} size="sm" className="rounded-none bg-slate-900 text-white hover:bg-slate-800"><Download size={15} /> {isDownloading ? "Generating…" : "Download PDF"}</Button>}<Button data-testid="builder-preview-button" onClick={printQuote} disabled={!canPrint} title={canPrint ? "Print or save the customer release as PDF" : "Save and complete release details first"} variant="outline" size="sm" className="rounded-none border-slate-300"><Printer size={15} /> Print / PDF</Button><Button data-testid="builder-save-button" onClick={() => saveMutation.mutate()} disabled={!canSave || saveMutation.isPending} size="sm" className="rounded-none bg-orange-600 px-4 text-white hover:bg-orange-700"><Save size={15} /> {saveMutation.isPending ? "Saving…" : "Save quote"}</Button></div></div></header>
 
       <main className="mx-auto max-w-[1500px] px-5 py-7 lg:px-8 lg:py-9">
         <div className="mb-7 flex items-center gap-2 text-xs text-slate-500 print:hidden"><Link to="/" className="hover:text-orange-600">Workspace</Link><ChevronRight size={14} /><span className="font-semibold text-slate-700">Quote builder</span></div>
@@ -322,6 +344,14 @@ export default function QuoteBuilder() {
           <div className="mt-10 border-t border-slate-200 pt-4 text-[10px] text-slate-400"><p>Quotation reference: <span className="font-mono text-slate-600">{documentReference}</span></p><p className="mt-1">Release date: {documentReleaseDate}</p></div>
           <DocumentPageFooter pageNumber={commercialPages.length + 3} pageCount={documentPageCount} />
         </section>
+
+        <Dialog open={missingFieldsOpen} onOpenChange={setMissingFieldsOpen}>
+          <DialogContent data-testid="missing-release-data-dialog" className="max-w-lg rounded-none">
+            <DialogHeader><DialogTitle>Please complete the required data prior to release</DialogTitle><DialogDescription>The following information is still missing from this quotation:</DialogDescription></DialogHeader>
+            <ul data-testid="missing-release-data-list" className="max-h-[45vh] space-y-2 overflow-y-auto border-y border-slate-200 py-4">{missingReleaseFields.map((field) => <li data-testid={`missing-release-field-${field.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} key={field} className="flex items-start gap-3 text-sm text-slate-700"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 bg-orange-600" />{field}</li>)}</ul>
+            <DialogFooter><Button data-testid="missing-release-dialog-close-button" onClick={() => setMissingFieldsOpen(false)} className="rounded-none bg-slate-900 text-white hover:bg-slate-800">Return to quotation</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
