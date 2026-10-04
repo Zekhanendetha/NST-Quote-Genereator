@@ -8,10 +8,11 @@ import { apiGet, apiPost, apiPut } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { generateQuotePdf } from "@/lib/generateQuotePdf";
-import { CURRENCIES, CATEGORY_LABELS, formatMoney, type BuilderMode, type ChargeType, type CompanyProfile, type CostAddonType, type LineCategory, type PriceMethod, type Quote, type QuoteLineItemInput, type QuotePayload, type SalesPricing } from "@/lib/types";
+import { CURRENCIES, CATEGORY_LABELS, formatMoney, type BuilderMode, type ChargeType, type CompanyProfile, type CostAddonType, type LineCategory, type PriceMethod, type Quote, type QuoteLineItemInput, type QuotePayload, type SalesPricing, type TermsClause } from "@/lib/types";
 
 const emptyItem = (): QuoteLineItemInput => ({ description: "", description_details: "", category: "service", charge_type: "daily", sales_pricing: "unit", uom: "day", quantity: 1, duration_days: 1, price_method: "sell_rate", sell_rate: 0, target_margin_percent: 0, cost_rate: 0, cost_addon_type: "none", cost_addon_percent: 0 });
-const initialForm: QuotePayload = { builder_mode: "margin_calculator", overall_cost: 0, quote_number: "", release_date: "", client_name: "", client_company: "", client_email: "", client_location: "", customer_reference: "", delivery_point: "", company_name: "", company_address: "", company_email: "", company_phone: "", company_logo: "", prepared_by_name: "", prepared_by_title: "", prepared_by_email: "", prepared_by_phone: "", quote_title: "Commercial Quotation", subject: "", currency: "USD", usd_exchange_rate: 1, tax_enabled: false, tax_rate: 5, payment_terms: "30 days from invoice", lead_time: "To be confirmed", valid_days: 30, notes: "This quotation is subject to final scope confirmation and availability.", release_notes: "", commission_amount: 0, line_items: [emptyItem()] };
+const defaultTerms = (): TermsClause[] => [{ id: "price-basis", title: "Price Basis", content: "All prices are quoted in {{currency}} unless otherwise stated." }, { id: "payment-terms", title: "Payment Terms", content: "{{payment_terms}}" }, { id: "delivery-lead-time", title: "Delivery Lead Time", content: "{{lead_time}} after official release of the Purchase Order (PO)." }, { id: "scope-of-supply", title: "Scope of Supply", content: "As per quotation subject: “{{subject}}”." }, { id: "order-confirmation", title: "Order Confirmation", content: "The Purchase Order shall be deemed accepted only upon written confirmation by the Seller." }, { id: "change-to-order", title: "Change to Order", content: "Any changes to specifications, quantity, or delivery schedule after order confirmation may result in adjustments to price and delivery lead time." }];
+const initialForm: QuotePayload = { builder_mode: "margin_calculator", overall_cost: 0, quote_number: "", release_date: "", client_name: "", client_company: "", client_email: "", client_location: "", customer_reference: "", delivery_point: "", company_name: "", company_address: "", company_email: "", company_phone: "", company_logo: "", prepared_by_name: "", prepared_by_title: "", prepared_by_email: "", prepared_by_phone: "", quote_title: "Commercial Quotation", subject: "", currency: "USD", usd_exchange_rate: 1, tax_enabled: false, tax_rate: 5, payment_terms: "30 days from invoice", lead_time: "To be confirmed", valid_days: 30, notes: "This quotation is subject to final scope confirmation and availability.", release_notes: "", terms_conditions: defaultTerms(), commission_amount: 0, line_items: [emptyItem()] };
 
 const lineValue = (item: QuoteLineItemInput, rate: number) => item.category === "sales"
   ? (item.sales_pricing === "line_total" ? rate : item.quantity * rate)
@@ -160,6 +161,28 @@ function paginateLineItems(items: QuoteLineItemInput[]) {
   return pages;
 }
 
+const estimatedTermUnits = (term: TermsClause) => Math.max(1, Math.ceil((term.title.length + term.content.length) / 220));
+
+function paginateTerms(terms: TermsClause[]) {
+  const pages: TermsClause[][] = [];
+  let current: TermsClause[] = [];
+  let used = 0;
+  for (const term of terms) {
+    const units = estimatedTermUnits(term);
+    if (current.length && used + units > 8) { pages.push(current); current = []; used = 0; }
+    current.push(term);
+    used += units;
+  }
+  if (current.length || !pages.length) pages.push(current);
+  return pages;
+}
+
+const resolveTermContent = (content: string, form: QuotePayload) => content
+  .replaceAll("{{currency}}", form.currency)
+  .replaceAll("{{payment_terms}}", form.payment_terms)
+  .replaceAll("{{lead_time}}", form.lead_time)
+  .replaceAll("{{subject}}", form.subject);
+
 function DocumentPageFooter({ pageNumber, pageCount }: { pageNumber: number; pageCount: number }) {
   return <div className="document-page-footer absolute inset-x-12 bottom-6 border-t border-slate-200 pt-2 text-center font-mono text-[9px] tracking-[0.12em] text-slate-400">CONFIDENTIAL · Page {pageNumber} of {pageCount}</div>;
 }
@@ -219,6 +242,7 @@ export default function QuoteBuilder() {
   const [form, setForm] = useState<QuotePayload>(initialForm);
   const [isDownloading, setIsDownloading] = useState(false);
   const [missingFieldsOpen, setMissingFieldsOpen] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(true);
   const quoteQuery = useQuery({ queryKey: ["quote", id], queryFn: () => fetchQuote(id as string), enabled: Boolean(id), retry: false });
   const profileQuery = useQuery({ queryKey: ["company-profile"], queryFn: fetchCompanyProfile, retry: false });
 
@@ -248,7 +272,8 @@ export default function QuoteBuilder() {
     return { subtotal, baseSubtotal, cost, tax, total: subtotal + tax, profit, margin: marginRevenue ? profit / marginRevenue * 100 : 0, commissionPerLine };
   }, [form]);
   const commercialPages = useMemo(() => paginateLineItems(form.line_items), [form.line_items]);
-  const documentPageCount = commercialPages.length + 3;
+  const termsPages = useMemo(() => paginateTerms(form.terms_conditions), [form.terms_conditions]);
+  const documentPageCount = commercialPages.length + termsPages.length + 2;
   const documentReference = form.quote_number || quoteQuery.data?.quote_number || "DRAFT / PREVIEW";
   const documentReleaseDate = form.release_date || quoteQuery.data?.release_date || quoteQuery.data?.issue_date || "Select date";
   const missingReleaseFields = useMemo(() => {
@@ -289,6 +314,10 @@ export default function QuoteBuilder() {
     window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>(`[data-testid="line-item-description-input-${nextIndex}"]`)?.focus());
   };
   const removeItem = (index: number) => setForm((current) => ({ ...current, line_items: current.line_items.filter((_, itemIndex) => itemIndex !== index) }));
+  const updateTerm = (index: number, key: "title" | "content", value: string) => setForm((current) => ({ ...current, terms_conditions: current.terms_conditions.map((term, termIndex) => termIndex === index ? { ...term, [key]: value } : term) }));
+  const addTerm = () => setForm((current) => ({ ...current, terms_conditions: [...current.terms_conditions, { id: crypto.randomUUID(), title: "New Term", content: "Enter the quotation term or condition." }] }));
+  const removeTerm = (index: number) => setForm((current) => ({ ...current, terms_conditions: current.terms_conditions.filter((_, termIndex) => termIndex !== index) }));
+  const moveTerm = (index: number, direction: -1 | 1) => setForm((current) => { const next = [...current.terms_conditions]; const destination = index + direction; if (destination < 0 || destination >= next.length) return current; [next[index], next[destination]] = [next[destination], next[index]]; return { ...current, terms_conditions: next }; });
   const saveMutation = useMutation({
     mutationFn: () => id ? apiPut<Quote>(`/quotes/${id}`, form) : apiPost<Quote>("/quotes", form),
     onSuccess: (saved) => { queryClient.invalidateQueries({ queryKey: ["quotes"] }); queryClient.setQueryData(["quote", saved.id], saved); toast.success("Quote saved to your release history"); navigate(`/quotes/${saved.id}`, { replace: true }); },
@@ -297,7 +326,7 @@ export default function QuoteBuilder() {
 
   const canSave = form.client_name.trim() && form.client_company.trim() && form.company_name.trim() && (form.currency === "USD" || (form.usd_exchange_rate ?? 0) > 0) && form.line_items.length > 0 && form.line_items.every((item) => item.uom.trim());
   const canPrint = missingReleaseFields.length === 0;
-  const downloadPdf = async () => { if (missingReleaseFields.length) { setMissingFieldsOpen(true); return; } setIsDownloading(true); try { const pages = Array.from(document.querySelectorAll<HTMLElement>("[data-pdf-page='true']")); const filename = await generateQuotePdf({ pages, quoteNumber: documentReference, subject: form.subject, companyName: form.company_name }); toast.success(`Downloaded ${filename}`); } catch { toast.error("Unable to generate the PDF. Please try Print / PDF instead."); } finally { setIsDownloading(false); } };
+  const downloadPdf = async () => { if (missingReleaseFields.length) { setMissingFieldsOpen(true); return; } const restoreHidden = !previewVisible; setIsDownloading(true); try { if (restoreHidden) { setPreviewVisible(true); await new Promise<void>((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))); } const pages = Array.from(document.querySelectorAll<HTMLElement>("[data-pdf-page='true']")); const filename = await generateQuotePdf({ pages, quoteNumber: documentReference, subject: form.subject, companyName: form.company_name }); toast.success(`Downloaded ${filename}`); } catch { toast.error("Unable to generate the PDF. Please try again."); } finally { if (restoreHidden) setPreviewVisible(false); setIsDownloading(false); } };
 
   return (
     <div className="min-h-svh bg-[#f4f4f5] text-slate-950">
@@ -324,6 +353,8 @@ export default function QuoteBuilder() {
             </section>
 
             <section className="border border-slate-200 bg-white p-6 lg:p-7 print:hidden"><div className="mb-5"><p className="data-label text-orange-600">04 / Internal view</p><h2 data-testid="margin-section-heading" className="mt-2 font-heading text-2xl font-bold tracking-tight">Margin &amp; P&amp;L snapshot</h2></div><div className="grid grid-cols-2 gap-px border border-slate-200 bg-slate-200 md:grid-cols-4"><div className="bg-white p-4"><p className="data-label">{form.builder_mode === "quote_only" ? "Item revenue" : "Revenue"}</p><p data-testid="pnl-revenue" className="mt-3 font-mono text-lg font-bold">{formatMoney(form.builder_mode === "quote_only" ? totals.baseSubtotal : totals.subtotal, form.currency)}</p></div><div className="bg-white p-4"><p className="data-label">{form.builder_mode === "quote_only" ? "Overall cost" : "Cost + add-ons"}</p><p data-testid="pnl-cost" className="mt-3 font-mono text-lg font-bold">{formatMoney(totals.cost, form.currency)}</p></div><div className="bg-orange-50 p-4"><p className="data-label text-orange-700">Gross profit</p><p data-testid="pnl-profit" className="mt-3 font-mono text-lg font-bold text-orange-700">{formatMoney(totals.profit, form.currency)}</p></div><div className="bg-orange-50 p-4"><p className="data-label text-orange-700">Margin</p><p data-testid="pnl-margin" className="mt-3 font-mono text-lg font-bold text-orange-700">{totals.margin.toFixed(1)}%</p></div></div><p data-testid="pnl-guidance" className="mt-4 flex items-center gap-2 text-xs text-slate-500"><Calculator size={14} className="text-orange-600" /> {form.builder_mode === "quote_only" ? "Overall margin excludes quote commission and customer tax. Switching modes preserves hidden per-line cost data." : "Cost add-ons increase the internal cost base; commission is distributed into client-facing line prices."}</p></section>
+
+            <section data-testid="terms-editor-section" className="border border-slate-200 bg-white p-6 lg:p-7 print:hidden"><div className="mb-5"><p className="data-label text-orange-600">05 / Terms &amp; Conditions</p><h2 className="mt-2 font-heading text-2xl font-bold tracking-tight">Quotation T&amp;C editor</h2><p className="mt-2 text-sm leading-6 text-slate-500">Edit, reorder, remove, or add clauses for this quotation only. Supported live tokens: <span className="font-mono text-xs text-orange-700">{"{{currency}} {{payment_terms}} {{lead_time}} {{subject}}"}</span></p></div><div className="space-y-4">{form.terms_conditions.map((term, index) => <div data-testid={`terms-editor-item-${index}`} key={term.id} className="border border-slate-200 bg-slate-50/60 p-4"><div className="mb-3 flex items-center justify-between gap-3"><span className="grid h-6 w-6 place-items-center bg-slate-900 font-mono text-xs text-white">{String(index + 1).padStart(2, "0")}</span><div className="flex items-center gap-1"><button type="button" data-testid={`terms-move-up-${index}`} disabled={index === 0} onClick={() => moveTerm(index, -1)} className="grid h-7 w-7 place-items-center border border-slate-200 bg-white text-slate-500 hover:border-orange-400 hover:text-orange-700 disabled:opacity-30" aria-label={`Move ${term.title} up`}>↑</button><button type="button" data-testid={`terms-move-down-${index}`} disabled={index === form.terms_conditions.length - 1} onClick={() => moveTerm(index, 1)} className="grid h-7 w-7 place-items-center border border-slate-200 bg-white text-slate-500 hover:border-orange-400 hover:text-orange-700 disabled:opacity-30" aria-label={`Move ${term.title} down`}>↓</button><button type="button" data-testid={`terms-delete-${index}`} onClick={() => removeTerm(index)} className="grid h-7 w-7 place-items-center text-slate-400 hover:text-red-600" aria-label={`Delete ${term.title}`}><Trash2 size={14} /></button></div></div><div className="space-y-3"><Field label="Clause title" testId={`terms-title-${index}`}><TextInput testId={`terms-title-input-${index}`} value={term.title} onChange={(value) => updateTerm(index, "title", value)} /></Field><Field label="Clause content" testId={`terms-content-${index}`}><textarea data-testid={`terms-content-input-${index}`} value={term.content} onChange={(event) => updateTerm(index, "content", event.target.value)} rows={3} className="w-full resize-y border border-slate-300 bg-white px-3 py-2.5 text-sm leading-6 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></Field></div></div>)}</div><Button data-testid="terms-add-clause-button" onClick={addTerm} variant="outline" className="mt-4 w-full rounded-none border-dashed border-slate-300 py-5 hover:border-orange-400 hover:bg-orange-50 hover:text-orange-700"><Plus size={15} /> Add T&amp;C clause</Button></section>
           </div>
 
           <aside className="space-y-7 lg:col-span-4">
@@ -346,23 +377,19 @@ export default function QuoteBuilder() {
           </aside>
         </div>
 
+        <section data-testid="quote-preview-controls" className="mt-8 flex items-center justify-between border border-slate-200 bg-white p-4 print:hidden"><div><p className="data-label text-orange-600">Quote preview</p><p className="mt-1 text-sm text-slate-500">Review the customer-facing A4 release pages while you work.</p></div><Button data-testid="quote-preview-toggle-button" aria-expanded={previewVisible} onClick={() => setPreviewVisible((visible) => !visible)} variant="outline" className="rounded-none border-slate-300">{previewVisible ? "Hide Quote Preview" : "Show Quote Preview"}</Button></section>
+
+        {previewVisible ? <>
         <IntroductionDocumentPage form={form} reference={documentReference} releaseDate={documentReleaseDate} pageCount={documentPageCount} />
         {commercialPages.map((entries, pageIndex) => <CommercialDocumentPage key={pageIndex} form={form} entries={entries} pageIndex={pageIndex} commercialPageCount={commercialPages.length} totalPageCount={documentPageCount} reference={documentReference} releaseDate={documentReleaseDate} totals={totals} />)}
 
-        <section data-testid="terms-page" data-pdf-page="true" className="quotation-page print-document relative mx-auto mt-8 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)]">
-          <DocumentHeader form={form} reference={documentReference} releaseDate={documentReleaseDate} prefix="terms-header" />
-          <div className="mt-6"><p className="data-label text-orange-600">Quotation appendix</p><h2 className="mt-2 font-heading text-2xl font-bold tracking-tight">Quotation Terms and Conditions</h2></div>
-          <div className="mt-5 divide-y divide-slate-200 border-y border-slate-200 text-xs">
-            <div data-testid="terms-price-basis" className="grid grid-cols-[150px_1fr] gap-5 py-3"><p className="data-label text-slate-500">Price Basis</p><p className="leading-5 text-slate-700">All prices are quoted in <strong>{form.currency}</strong> unless otherwise stated.</p></div>
-            <div data-testid="terms-payment" className="grid grid-cols-[150px_1fr] gap-5 py-3"><p className="data-label text-slate-500">Payment Terms</p><p className="whitespace-pre-line leading-5 text-slate-700">{form.payment_terms || "To be mutually agreed and stated in the Purchase Order."}</p></div>
-            <div data-testid="terms-delivery" className="grid grid-cols-[150px_1fr] gap-5 py-3"><p className="data-label text-slate-500">Delivery Lead Time</p><p className="leading-5 text-slate-700">{form.lead_time || "To be confirmed"} after official release of the Purchase Order (PO).</p></div>
-            <div data-testid="terms-scope" className="grid grid-cols-[150px_1fr] gap-5 py-3"><p className="data-label text-slate-500">Scope of Supply</p><p className="leading-5 text-slate-700">As per quotation subject: “{form.subject || "Subject to be confirmed"}”.</p></div>
-            <div data-testid="terms-order-confirmation" className="grid grid-cols-[150px_1fr] gap-5 py-3"><p className="data-label text-slate-500">Order Confirmation</p><p className="leading-5 text-slate-700">The Purchase Order shall be deemed accepted only upon written confirmation by the Seller.</p></div>
-            <div data-testid="terms-change-order" className="grid grid-cols-[150px_1fr] gap-5 py-3"><p className="data-label text-slate-500">Change to Order</p><p className="leading-5 text-slate-700">Any changes to specifications, quantity, or delivery schedule after order confirmation may result in adjustments to price and delivery lead time.</p></div>
-          </div>
-          <p className="mt-6 text-[10px] leading-4 text-slate-400">These Terms and Conditions form an integral part of quotation {documentReference}.</p>
-          <DocumentPageFooter pageNumber={commercialPages.length + 2} pageCount={documentPageCount} />
-        </section>
+        {termsPages.map((terms, termsPageIndex) => <section data-testid={termsPageIndex === 0 ? "terms-page" : `terms-page-${termsPageIndex + 1}`} data-pdf-page="true" key={termsPageIndex} className="quotation-page print-document relative mx-auto mt-8 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)]">
+          <DocumentHeader form={form} reference={documentReference} releaseDate={documentReleaseDate} prefix={`terms-header-${termsPageIndex + 1}`} />
+          <div className="mt-6"><p className="data-label text-orange-600">{termsPageIndex === 0 ? "Quotation appendix" : "Quotation appendix · Continued"}</p><h2 className="mt-2 font-heading text-2xl font-bold tracking-tight">Quotation Terms and Conditions{termsPageIndex === 0 ? "" : ` · ${termsPageIndex + 1}`}</h2></div>
+          <div className="mt-5 divide-y divide-slate-200 border-y border-slate-200 text-xs">{terms.map((term) => <div data-testid={`terms-${term.id}`} key={term.id} className="grid grid-cols-[150px_1fr] gap-5 py-3"><p className="break-words data-label text-slate-500">{term.title}</p><p className="whitespace-pre-line break-words leading-5 text-slate-700">{resolveTermContent(term.content, form)}</p></div>)}</div>
+          {termsPageIndex === termsPages.length - 1 && <p className="mt-6 text-[10px] leading-4 text-slate-400">These Terms and Conditions form an integral part of quotation {documentReference}.</p>}
+          <DocumentPageFooter pageNumber={commercialPages.length + 2 + termsPageIndex} pageCount={documentPageCount} />
+        </section>)}
 
         <section data-testid="acceptance-page" data-pdf-page="true" className="quotation-page print-document relative mx-auto mt-8 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)]">
           <DocumentHeader form={form} reference={documentReference} releaseDate={documentReleaseDate} prefix="acceptance-header" />
@@ -371,8 +398,9 @@ export default function QuoteBuilder() {
           <div className="mt-6 border border-slate-200 p-4"><p className="data-label text-slate-500">For and on Behalf of</p><p data-testid="acceptance-customer-name" className="mt-2 font-heading text-xl font-bold text-slate-900">{form.client_company || "Customer Name"}</p></div>
           <div className="mt-8 grid grid-cols-2 gap-x-10 gap-y-8 text-xs"><div><p className="data-label text-slate-400">Name</p><div className="mt-7 border-b border-slate-500" /></div><div><p className="data-label text-slate-400">Designation</p><div className="mt-7 border-b border-slate-500" /></div><div><p className="data-label text-slate-400">Date</p><div className="mt-7 border-b border-slate-500" /></div><div><p className="data-label text-slate-400">Signature</p><div className="mt-7 border-b border-slate-500" /></div></div>
           <div className="mt-10 border-t border-slate-200 pt-4 text-[10px] text-slate-400"><p>Quotation reference: <span className="font-mono text-slate-600">{documentReference}</span></p><p className="mt-1">Release date: {documentReleaseDate}</p></div>
-          <DocumentPageFooter pageNumber={commercialPages.length + 3} pageCount={documentPageCount} />
+          <DocumentPageFooter pageNumber={documentPageCount} pageCount={documentPageCount} />
         </section>
+        </> : <div data-testid="quote-preview-hidden-state" className="mx-auto mt-8 max-w-[800px] border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500 print:hidden">Quote preview is hidden. Use “Show Quote Preview” above to review the A4 release pages.</div>}
 
         <Dialog open={missingFieldsOpen} onOpenChange={setMissingFieldsOpen}>
           <DialogContent data-testid="missing-release-data-dialog" className="max-w-lg rounded-none">

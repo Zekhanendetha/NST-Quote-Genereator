@@ -32,6 +32,12 @@ export interface QuoteLineItem extends QuoteLineItemInput {
   commission_allocation: number;
 }
 
+export interface TermsClause {
+  id: string;
+  title: string;
+  content: string;
+}
+
 export interface QuotePayload {
   builder_mode: BuilderMode;
   overall_cost: number;
@@ -63,6 +69,7 @@ export interface QuotePayload {
   valid_days: number;
   notes: string;
   release_notes: string;
+  terms_conditions: TermsClause[];
   commission_amount: number;
   line_items: QuoteLineItemInput[];
 }

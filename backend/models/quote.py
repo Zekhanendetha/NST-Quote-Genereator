@@ -13,6 +13,23 @@ CostAddonType = Literal["none", "local_tax", "import_tax", "custom"]
 BuilderMode = Literal["margin_calculator", "quote_only"]
 
 
+class TermsClause(BaseModel):
+    id: str
+    title: str
+    content: str
+
+
+def default_terms_conditions() -> list[TermsClause]:
+    return [
+        TermsClause(id="price-basis", title="Price Basis", content="All prices are quoted in {{currency}} unless otherwise stated."),
+        TermsClause(id="payment-terms", title="Payment Terms", content="{{payment_terms}}"),
+        TermsClause(id="delivery-lead-time", title="Delivery Lead Time", content="{{lead_time}} after official release of the Purchase Order (PO)."),
+        TermsClause(id="scope-of-supply", title="Scope of Supply", content='As per quotation subject: “{{subject}}”.'),
+        TermsClause(id="order-confirmation", title="Order Confirmation", content="The Purchase Order shall be deemed accepted only upon written confirmation by the Seller."),
+        TermsClause(id="change-to-order", title="Change to Order", content="Any changes to specifications, quantity, or delivery schedule after order confirmation may result in adjustments to price and delivery lead time."),
+    ]
+
+
 class QuoteLineItemInput(BaseModel):
     description: str = ""
     description_details: str = ""
@@ -61,6 +78,7 @@ class QuoteCreate(BaseModel):
     valid_days: int = Field(default=30, ge=1, le=365)
     notes: str = ""
     release_notes: str = ""
+    terms_conditions: list[TermsClause] = Field(default_factory=default_terms_conditions)
     commission_amount: float = Field(default=0, ge=0)
     line_items: list[QuoteLineItemInput] = Field(min_length=1)
 
@@ -108,6 +126,7 @@ class Quote(BaseModel):
     valid_days: int
     notes: str
     release_notes: str = ""
+    terms_conditions: list[TermsClause] = Field(default_factory=default_terms_conditions)
     line_items: list[QuoteLineItem]
     subtotal: float
     total_cost: float
