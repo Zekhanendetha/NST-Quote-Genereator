@@ -9,28 +9,41 @@ from models.quote import Quote, QuoteCreate, QuoteLineItem
 router = APIRouter(prefix="/quotes", tags=["quotes"])
 
 
+def base_line_value(item, rate: float) -> float:
+    if item.category == "sales":
+        return rate if item.sales_pricing == "line_total" else item.quantity * rate
+    multiplier = item.duration_days if item.charge_type == "daily" else 1
+    return item.quantity * rate * multiplier
+
+
 def build_quote(payload: QuoteCreate) -> Quote:
     items: list[QuoteLineItem] = []
     subtotal = 0.0
     total_cost = 0.0
+    commission_per_line = payload.commission_amount / len(payload.line_items) if payload.line_items else 0
 
-    for item in payload.line_items:
-        if item.category == "sales":
-            line_total = item.sell_rate if item.sales_pricing == "line_total" else item.quantity * item.sell_rate
-            line_cost = item.cost_rate if item.sales_pricing == "line_total" else item.quantity * item.cost_rate
-        else:
-            multiplier = item.duration_days if item.charge_type == "daily" else 1
-            line_total = item.quantity * item.sell_rate * multiplier
-            line_cost = item.quantity * item.cost_rate * multiplier
-        line_total = round(line_total, 2)
-        line_cost = round(line_cost, 2)
+    for index, item in enumerate(payload.line_items):
+        commission_allocation = round(commission_per_line, 2)
+        if index == len(payload.line_items) - 1:
+            commission_allocation = round(payload.commission_amount - round(commission_per_line, 2) * (len(payload.line_items) - 1), 2)
+        base_total = base_line_value(item, item.sell_rate)
+        base_cost = base_line_value(item, item.cost_rate)
+        cost_addon_amount = round(base_cost * item.cost_addon_percent / 100, 2)
+        line_total = base_total + commission_allocation
+        line_cost = base_cost + cost_addon_amount
         subtotal += line_total
         total_cost += line_cost
+        line_total = round(line_total, 2)
+        line_cost = round(line_cost, 2)
         items.append(
             QuoteLineItem(
                 **item.model_dump(),
                 line_total=line_total,
                 line_cost=line_cost,
+                base_total=round(base_total, 2),
+                base_cost=round(base_cost, 2),
+                cost_addon_amount=cost_addon_amount,
+                commission_allocation=commission_allocation,
             )
         )
 
@@ -53,6 +66,7 @@ def build_quote(payload: QuoteCreate) -> Quote:
         grand_total=grand_total,
         gross_profit=gross_profit,
         margin_percent=margin_percent,
+        commission_per_line=round(commission_per_line, 2),
     )
 
 

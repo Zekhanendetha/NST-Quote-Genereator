@@ -12,12 +12,17 @@ export interface QuoteLineItemInput {
   duration_days: number;
   sell_rate: number;
   cost_rate: number;
+  cost_addon_percent: number;
 }
 
 export interface QuoteLineItem extends QuoteLineItemInput {
   id: string;
   line_total: number;
   line_cost: number;
+  base_total: number;
+  base_cost: number;
+  cost_addon_amount: number;
+  commission_allocation: number;
 }
 
 export interface QuotePayload {
@@ -37,6 +42,7 @@ export interface QuotePayload {
   lead_time: string;
   valid_days: number;
   notes: string;
+  commission_amount: number;
   line_items: QuoteLineItemInput[];
 }
 
@@ -53,6 +59,7 @@ export interface Quote extends QuotePayload {
   grand_total: number;
   gross_profit: number;
   margin_percent: number;
+  commission_per_line: number;
 }
 
 export const CURRENCIES = ["USD", "EUR", "GBP", "AED", "SAR", "NGN"];

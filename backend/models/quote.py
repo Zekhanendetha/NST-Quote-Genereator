@@ -20,6 +20,7 @@ class QuoteLineItemInput(BaseModel):
     duration_days: float = Field(default=1, gt=0)
     sell_rate: float = Field(ge=0)
     cost_rate: float = Field(ge=0)
+    cost_addon_percent: float = Field(default=0, ge=0, le=1000)
 
 
 class QuoteCreate(BaseModel):
@@ -39,6 +40,7 @@ class QuoteCreate(BaseModel):
     lead_time: str = "To be confirmed"
     valid_days: int = Field(default=30, ge=1, le=365)
     notes: str = ""
+    commission_amount: float = Field(default=0, ge=0)
     line_items: list[QuoteLineItemInput] = Field(min_length=1)
 
 
@@ -46,6 +48,10 @@ class QuoteLineItem(QuoteLineItemInput):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     line_total: float
     line_cost: float
+    base_total: float = 0
+    base_cost: float = 0
+    cost_addon_amount: float = 0
+    commission_allocation: float = 0
 
 
 class Quote(BaseModel):
@@ -77,3 +83,5 @@ class Quote(BaseModel):
     grand_total: float
     gross_profit: float
     margin_percent: float
+    commission_amount: float = 0
+    commission_per_line: float = 0
