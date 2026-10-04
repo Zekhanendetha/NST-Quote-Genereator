@@ -106,15 +106,82 @@ function QuotationLineRow({ item, index, currency, commissionPerLine }: { item: 
 }
 
 function DocumentLogo({ logo, companyName, testId }: { logo: string; companyName: string; testId: string }) {
-  return <div className="flex min-h-14 items-start justify-center border-b border-slate-100 pb-3">{logo && <img data-testid={testId} src={logo} alt={`${companyName} logo`} className="h-12 max-w-[190px] object-contain" />}</div>;
+  return <div className="flex min-h-16 items-start justify-center border-b border-slate-100 pb-3">{logo && <img data-testid={testId} src={logo} alt={`${companyName} logo`} className="h-14 max-w-[240px] object-contain" />}</div>;
 }
 
 function DocumentHeader({ form, reference, releaseDate, prefix }: { form: QuotePayload; reference: string; releaseDate: string; prefix: string }) {
   return (
     <div className="document-page-header">
       <DocumentLogo logo={form.company_logo} companyName={form.company_name} testId={`${prefix}-company-logo`} />
-      <div className="border-b-4 border-orange-600 py-4"><div className="flex items-start justify-between gap-6"><div><p className="data-label text-orange-600">{form.company_name || "Company Name"}</p><h2 data-testid={`${prefix}-quote-title`} className="mt-2 font-heading text-2xl font-bold tracking-tight">{form.quote_title}</h2><p data-testid={`${prefix}-subject`} className="mt-1.5 max-w-md text-xs leading-5 text-slate-600">{form.subject || "Quotation subject"}</p></div><div className="min-w-[170px] text-right"><p data-testid={`${prefix}-confidential`} className="data-label text-red-700">Confidential</p><p className="mt-1.5 data-label">Commercial offer</p><p data-testid={`${prefix}-quote-reference`} className="mt-1.5 font-mono text-xs font-bold">{reference}</p><p data-testid={`${prefix}-release-date`} className="mt-1.5 text-[10px] text-slate-500">Release date: <span className="font-semibold text-slate-700">{releaseDate}</span></p><p className="mt-1 text-[10px] text-slate-500">Validity: {form.valid_days} days</p></div></div></div>
+      <div className="border-b-4 border-orange-600 py-4"><div className="flex items-start justify-between gap-6"><div className="min-w-0 flex-1"><p className="break-words data-label text-orange-600">{form.company_name || "Company Name"}</p><h2 data-testid={`${prefix}-quote-title`} className="mt-2 break-words font-heading text-2xl font-bold tracking-tight">{form.quote_title}</h2><p data-testid={`${prefix}-subject`} className="mt-1.5 max-w-md break-words text-xs leading-5 text-slate-600">{form.subject || "Quotation subject"}</p></div><div className="w-[170px] shrink-0 text-right"><p data-testid={`${prefix}-confidential`} className="data-label text-red-700">Confidential</p><p className="mt-1.5 data-label">Commercial offer</p><p data-testid={`${prefix}-quote-reference`} className="mt-1.5 break-words font-mono text-xs font-bold">{reference}</p><p data-testid={`${prefix}-release-date`} className="mt-1.5 text-[10px] text-slate-500">Release date: <span className="font-semibold text-slate-700">{releaseDate}</span></p><p className="mt-1 text-[10px] text-slate-500">Validity: {form.valid_days} days</p></div></div></div>
     </div>
+  );
+}
+
+interface PageLineItem { item: QuoteLineItemInput; originalIndex: number }
+
+const estimatedItemUnits = (item: QuoteLineItemInput) => Math.max(1, Math.ceil((item.description.length + item.description_details.length) / 82));
+
+function takePageItems(items: PageLineItem[], capacity: number) {
+  const pageItems: PageLineItem[] = [];
+  let used = 0;
+  while (items.length) {
+    const units = estimatedItemUnits(items[0].item);
+    if (pageItems.length && used + units > capacity) break;
+    pageItems.push(items.shift() as PageLineItem);
+    used += units;
+  }
+  return pageItems;
+}
+
+function paginateLineItems(items: QuoteLineItemInput[]) {
+  const remaining = items.map((item, originalIndex) => ({ item, originalIndex }));
+  const totalUnits = remaining.reduce((sum, entry) => sum + estimatedItemUnits(entry.item), 0);
+  if (totalUnits <= 5) return [remaining];
+  const pages: PageLineItem[][] = [takePageItems(remaining, Math.min(8, Math.max(1, totalUnits - 5)))];
+  while (remaining.reduce((sum, entry) => sum + estimatedItemUnits(entry.item), 0) > 7) {
+    const remainingUnits = remaining.reduce((sum, entry) => sum + estimatedItemUnits(entry.item), 0);
+    pages.push(takePageItems(remaining, Math.min(14, Math.max(1, remainingUnits - 7))));
+  }
+  if (remaining.length) pages.push([...remaining]);
+  return pages;
+}
+
+function DocumentPageFooter({ pageNumber, pageCount }: { pageNumber: number; pageCount: number }) {
+  return <div className="document-page-footer absolute inset-x-12 bottom-6 border-t border-slate-200 pt-2 text-center font-mono text-[9px] tracking-[0.12em] text-slate-400">CONFIDENTIAL · Page {pageNumber} of {pageCount}</div>;
+}
+
+interface CommercialDocumentPageProps {
+  form: QuotePayload;
+  entries: PageLineItem[];
+  pageIndex: number;
+  commercialPageCount: number;
+  totalPageCount: number;
+  reference: string;
+  releaseDate: string;
+  totals: { subtotal: number; tax: number; total: number; commissionPerLine: number };
+}
+
+function CommercialDocumentPage({ form, entries, pageIndex, commercialPageCount, totalPageCount, reference, releaseDate, totals }: CommercialDocumentPageProps) {
+  const firstPage = pageIndex === 0;
+  const lastPage = pageIndex === commercialPageCount - 1;
+  return (
+    <section data-testid={firstPage ? "print-preview" : `commercial-page-${pageIndex + 1}`} data-pdf-page="true" className="quotation-page print-document relative mx-auto mt-8 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)]">
+      <DocumentHeader form={form} reference={reference} releaseDate={releaseDate} prefix={firstPage ? "preview" : `commercial-header-${pageIndex + 1}`} />
+      {firstPage ? <>
+        <div className="grid grid-cols-2 gap-8 border-b border-slate-200 py-4 text-xs"><div className="min-w-0"><p data-testid="preview-supplier-name" className="font-semibold">{form.company_name}</p>{(form.company_address || form.company_email || form.company_phone) && <p className="mt-1 whitespace-pre-line break-words text-[10px] leading-4 text-slate-500">{form.company_address}{form.company_email && <><br />{form.company_email}</>}{form.company_phone && <><br />{form.company_phone}</>}</p>}</div><div className="min-w-0"><p className="data-label">Customer</p><p data-testid="preview-client-name" className="mt-1.5 break-words font-semibold">{form.client_company}</p><p className="mt-1 break-words text-[10px] leading-4 text-slate-500">Attn: {form.client_name}{form.client_location && <><br />{form.client_location}</>}{form.client_email && <><br />{form.client_email}</>}{form.customer_reference && <><br />Ref: {form.customer_reference}</>}{form.delivery_point && <><br />Delivery point: {form.delivery_point}</>}</p></div></div>
+        <p data-testid="preview-introduction" className="mt-4 text-xs leading-5 text-slate-600"><strong className="text-slate-800">{form.company_name}</strong> is pleased to submit this quotation proposal regarding “{form.subject}” for your consideration and review. This proposal has been prepared based on the scope and requirements discussed and outlines our proposed solution, deliverables, and commercial terms for your evaluation.</p>
+      </> : <p className="mt-4 data-label text-orange-600">Commercial schedule · Continued</p>}
+      <table className="mt-4 w-full table-fixed text-left text-xs"><thead><tr className="border-b border-slate-900"><th className="w-[32%] pb-2 data-label">Description</th><th className="w-[14%] pb-2 data-label">Type / basis</th><th className="w-[9%] pb-2 text-right data-label">Qty</th><th className="w-[11%] pb-2 text-right data-label">UoM</th><th className="w-[17%] pb-2 text-right data-label">Item price</th><th className="w-[17%] pb-2 text-right data-label">Line amount</th></tr></thead><tbody>{entries.map(({ item, originalIndex }) => <QuotationLineRow key={originalIndex} item={item} index={originalIndex} currency={form.currency} commissionPerLine={totals.commissionPerLine} />)}</tbody></table>
+      {lastPage && <>
+        <div className="ml-auto mt-4 max-w-[260px] space-y-1.5 text-xs"><div className="flex justify-between"><span className="text-slate-500">Subtotal</span><span className="font-mono">{formatMoney(totals.subtotal, form.currency)}</span></div><div className="flex justify-between"><span className="text-slate-500">Tax</span><span className="font-mono">{formatMoney(totals.tax, form.currency)}</span></div><div className="flex justify-between border-t-2 border-slate-900 pt-2 text-sm font-bold"><span>TOTAL</span><span data-testid="preview-total" className="font-mono text-orange-700">{formatMoney(totals.total, form.currency)}</span></div></div>
+        <div className="mt-6 grid grid-cols-2 gap-8 border-t border-slate-200 pt-4 text-[10px] text-slate-500"><p><span className="font-semibold text-slate-700">Payment:</span> {form.payment_terms}</p><p><span className="font-semibold text-slate-700">Delivery:</span> {form.lead_time}</p></div>
+        {form.notes && <p data-testid="preview-notes" className="mt-3 whitespace-pre-line text-[10px] leading-4 text-slate-400">{form.notes}</p>}
+        {form.release_notes && <div data-testid="preview-release-notes" className="mt-4 border-l-2 border-orange-500 bg-orange-50 px-3 py-2"><p className="data-label text-orange-700">Release note</p><p className="mt-1.5 whitespace-pre-line text-[10px] leading-4 text-slate-600">{form.release_notes}</p></div>}
+        <div data-testid="preview-signature-block" className="mt-5 w-[44%] border border-slate-300 p-3 text-xs"><p className="font-semibold text-slate-700">Best Regards,</p><p className="mt-1 font-heading text-sm font-bold">{form.company_name}</p><div className="h-9" aria-label="Signature space" /><p data-testid="preview-prepared-by-name" className="border-t border-slate-400 pt-2 font-semibold text-slate-900">{form.prepared_by_name}</p><p data-testid="preview-prepared-by-title" className="mt-1 text-[9px] text-slate-500">{form.prepared_by_title}</p></div>
+      </>}
+      <DocumentPageFooter pageNumber={pageIndex + 1} pageCount={totalPageCount} />
+    </section>
   );
 }
 
@@ -150,6 +217,8 @@ export default function QuoteBuilder() {
     const profit = subtotal - cost;
     return { subtotal, baseSubtotal, cost, tax, total: subtotal + tax, profit, margin: subtotal ? profit / subtotal * 100 : 0, commissionPerLine };
   }, [form]);
+  const commercialPages = useMemo(() => paginateLineItems(form.line_items), [form.line_items]);
+  const documentPageCount = commercialPages.length + 2;
   const documentReference = form.quote_number || quoteQuery.data?.quote_number || "DRAFT / PREVIEW";
   const documentReleaseDate = form.release_date || quoteQuery.data?.release_date || quoteQuery.data?.issue_date || "Select date";
 
@@ -166,7 +235,7 @@ export default function QuoteBuilder() {
   const canSave = form.client_name.trim() && form.client_company.trim() && form.company_name.trim() && (form.currency === "USD" || (form.usd_exchange_rate ?? 0) > 0) && form.line_items.length > 0 && form.line_items.every((item) => item.description.trim() && item.uom.trim());
   const canPrint = Boolean(canSave && form.subject.trim() && form.prepared_by_name.trim() && form.prepared_by_title.trim() && documentReference !== "DRAFT / PREVIEW" && documentReleaseDate !== "Select date");
   const printQuote = () => { if (!canPrint) { toast.error("Save the quotation and complete its subject, release date, preparer, and title before PDF release."); return; } const originalTitle = document.title; document.title = ""; window.print(); document.title = originalTitle; };
-  const downloadPdf = () => { if (!canPrint) { toast.error("Save the quotation and complete its release details before downloading PDF."); return; } setIsDownloading(true); try { const filename = generateQuotePdf({ quote: form, quoteNumber: documentReference, releaseDate: documentReleaseDate }); toast.success(`Downloaded ${filename}`); } catch { toast.error("Unable to generate the PDF. Please try Print / PDF instead."); } finally { setIsDownloading(false); } };
+  const downloadPdf = async () => { if (!canPrint) { toast.error("Save the quotation and complete its release details before downloading PDF."); return; } setIsDownloading(true); try { const pages = Array.from(document.querySelectorAll<HTMLElement>("[data-pdf-page='true']")); const filename = await generateQuotePdf({ pages, quoteNumber: documentReference, subject: form.subject, companyName: form.company_name }); toast.success(`Downloaded ${filename}`); } catch { toast.error("Unable to generate the PDF. Please try Print / PDF instead."); } finally { setIsDownloading(false); } };
 
   return (
     <div className="min-h-svh bg-[#f4f4f5] text-slate-950">
@@ -211,21 +280,9 @@ export default function QuoteBuilder() {
           </aside>
         </div>
 
-        <div data-testid="print-running-header" className="print-running-header"><DocumentHeader form={form} reference={documentReference} releaseDate={documentReleaseDate} prefix="running-header" /></div>
+        {commercialPages.map((entries, pageIndex) => <CommercialDocumentPage key={pageIndex} form={form} entries={entries} pageIndex={pageIndex} commercialPageCount={commercialPages.length} totalPageCount={documentPageCount} reference={documentReference} releaseDate={documentReleaseDate} totals={totals} />)}
 
-        <section data-testid="print-preview" className="quotation-page print-document mx-auto mt-10 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)]">
-          <DocumentHeader form={form} reference={documentReference} releaseDate={documentReleaseDate} prefix="preview" />
-          <div className="grid grid-cols-2 gap-8 border-b border-slate-200 py-4 text-xs"><div><p data-testid="preview-supplier-name" className="font-semibold">{form.company_name}</p>{(form.company_address || form.company_email || form.company_phone) && <p className="mt-1 whitespace-pre-line text-[10px] leading-4 text-slate-500">{form.company_address}{form.company_email && <><br />{form.company_email}</>}{form.company_phone && <> · {form.company_phone}</>}</p>}</div><div><p className="data-label">Customer</p><p data-testid="preview-client-name" className="mt-1.5 font-semibold">{form.client_company}</p><p className="mt-1 text-[10px] leading-4 text-slate-500">Attn: {form.client_name}{form.client_location && <><br />{form.client_location}</>}{form.client_email && <><br />{form.client_email}</>}{form.customer_reference && <><br />Ref: {form.customer_reference}</>}{form.delivery_point && <><br />Delivery point: {form.delivery_point}</>}</p></div></div>
-          <p data-testid="preview-introduction" className="mt-4 text-xs leading-5 text-slate-600"><strong className="text-slate-800">{form.company_name || "Company Name"}</strong> is pleased to submit this quotation proposal regarding “{form.subject || "the stated scope"}” for your consideration and review. This proposal has been prepared based on the scope and requirements discussed and outlines our proposed solution, deliverables, and commercial terms for your evaluation.</p>
-          <table className="mt-4 w-full table-fixed text-left text-xs"><thead><tr className="border-b border-slate-900"><th className="w-[32%] pb-2 data-label">Description</th><th className="w-[14%] pb-2 data-label">Type / basis</th><th className="w-[9%] pb-2 text-right data-label">Qty</th><th className="w-[11%] pb-2 text-right data-label">UoM</th><th className="w-[17%] pb-2 text-right data-label">Item price</th><th className="w-[17%] pb-2 text-right data-label">Line amount</th></tr></thead><tbody>{form.line_items.map((item, index) => <QuotationLineRow key={index} item={item} index={index} currency={form.currency} commissionPerLine={totals.commissionPerLine} />)}</tbody></table>
-          <div className="ml-auto mt-4 max-w-[260px] space-y-1.5 text-xs"><div className="flex justify-between"><span className="text-slate-500">Subtotal</span><span className="font-mono">{formatMoney(totals.subtotal, form.currency)}</span></div><div className="flex justify-between"><span className="text-slate-500">Tax</span><span className="font-mono">{formatMoney(totals.tax, form.currency)}</span></div><div className="flex justify-between border-t-2 border-slate-900 pt-2 text-sm font-bold"><span>TOTAL</span><span data-testid="preview-total" className="font-mono text-orange-700">{formatMoney(totals.total, form.currency)}</span></div></div>
-          <div className="mt-6 grid grid-cols-2 gap-8 border-t border-slate-200 pt-4 text-[10px] text-slate-500"><p><span className="font-semibold text-slate-700">Payment:</span> {form.payment_terms}</p><p><span className="font-semibold text-slate-700">Delivery:</span> {form.lead_time}</p></div>
-          {form.notes && <p data-testid="preview-notes" className="mt-4 whitespace-pre-line text-xs leading-5 text-slate-400">{form.notes}</p>}
-          {form.release_notes && <div data-testid="preview-release-notes" className="mt-5 border-l-2 border-orange-500 bg-orange-50 px-4 py-3"><p className="data-label text-orange-700">Release note</p><p className="mt-2 whitespace-pre-line text-xs leading-5 text-slate-600">{form.release_notes}</p></div>}
-          <div data-testid="preview-signature-block" className="mt-6 w-[44%] border border-slate-300 p-4 text-xs"><p className="font-semibold text-slate-700">Best Regards,</p><p className="mt-1.5 font-heading text-base font-bold">{form.company_name || "Company Name"}</p><div className="h-12" aria-label="Signature space" /><p data-testid="preview-prepared-by-name" className="border-t border-slate-400 pt-2 font-semibold text-slate-900">{form.prepared_by_name || "Prepared by name"}</p><p data-testid="preview-prepared-by-title" className="mt-1 text-[10px] text-slate-500">{form.prepared_by_title || "Title"}</p></div>
-        </section>
-
-        <section data-testid="terms-page" className="quotation-page print-document mx-auto mt-8 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)]">
+        <section data-testid="terms-page" data-pdf-page="true" className="quotation-page print-document relative mx-auto mt-8 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)]">
           <DocumentHeader form={form} reference={documentReference} releaseDate={documentReleaseDate} prefix="terms-header" />
           <div className="mt-6"><p className="data-label text-orange-600">Quotation appendix</p><h2 className="mt-2 font-heading text-2xl font-bold tracking-tight">Quotation Terms and Conditions</h2></div>
           <div className="mt-5 divide-y divide-slate-200 border-y border-slate-200 text-xs">
@@ -237,15 +294,17 @@ export default function QuoteBuilder() {
             <div data-testid="terms-change-order" className="grid grid-cols-[150px_1fr] gap-5 py-3"><p className="data-label text-slate-500">Change to Order</p><p className="leading-5 text-slate-700">Any changes to specifications, quantity, or delivery schedule after order confirmation may result in adjustments to price and delivery lead time.</p></div>
           </div>
           <p className="mt-6 text-[10px] leading-4 text-slate-400">These Terms and Conditions form an integral part of quotation {documentReference}.</p>
+          <DocumentPageFooter pageNumber={commercialPages.length + 1} pageCount={documentPageCount} />
         </section>
 
-        <section data-testid="acceptance-page" className="quotation-page print-document mx-auto mt-8 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)]">
+        <section data-testid="acceptance-page" data-pdf-page="true" className="quotation-page print-document relative mx-auto mt-8 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)]">
           <DocumentHeader form={form} reference={documentReference} releaseDate={documentReleaseDate} prefix="acceptance-header" />
           <div className="mt-6"><p className="data-label text-orange-600">Formal acceptance</p><h2 className="mt-2 font-heading text-2xl font-bold tracking-tight">Customer Acceptance</h2></div>
           <p data-testid="acceptance-wording" className="mt-6 text-sm leading-6 text-slate-700">I hereby acknowledge and agree to the Terms and Conditions contained herein and certify that I am authorized to execute this Quotation. Accordingly, we consider this the only agreement between the Company and ourselves for the specific items outlined in this Quotation.</p>
           <div className="mt-6 border border-slate-200 p-4"><p className="data-label text-slate-500">For and on Behalf of</p><p data-testid="acceptance-customer-name" className="mt-2 font-heading text-xl font-bold text-slate-900">{form.client_company || "Customer Name"}</p></div>
           <div className="mt-8 grid grid-cols-2 gap-x-10 gap-y-8 text-xs"><div><p className="data-label text-slate-400">Name</p><div className="mt-7 border-b border-slate-500" /></div><div><p className="data-label text-slate-400">Designation</p><div className="mt-7 border-b border-slate-500" /></div><div><p className="data-label text-slate-400">Date</p><div className="mt-7 border-b border-slate-500" /></div><div><p className="data-label text-slate-400">Signature</p><div className="mt-7 border-b border-slate-500" /></div></div>
           <div className="mt-10 border-t border-slate-200 pt-4 text-[10px] text-slate-400"><p>Quotation reference: <span className="font-mono text-slate-600">{documentReference}</span></p><p className="mt-1">Release date: {documentReleaseDate}</p></div>
+          <DocumentPageFooter pageNumber={commercialPages.length + 2} pageCount={documentPageCount} />
         </section>
       </main>
     </div>

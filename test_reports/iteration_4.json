@@ -1,0 +1,67 @@
+{
+  "iteration": 4,
+  "summary": "Re-scoped to the new html2canvas-pro + jsPDF (no autotable) raster-capture acceptance matrix (6 criteria: fixed A4 pagination, preview/PDF parity, logo fit, long-address no-overlap, typography, filename+content completeness). Added 1 backend suite re-run (pre-existing release-pack persistence test, unaffected by the PDF-engine change) and 7 browser-check artifacts (6 criteria + 1 public-ingress cross-check for the parity criterion). All passed. Discovered mid-run that pypdf's per-page .images extraction is unreliable for this raster PDF (jsPDF/html2canvas dedupes/shares image XObjects across the page resource dictionary), so the content-completeness check was corrected to render real page content with PyMuPDF (page.get_pixmap) instead -- visually verified page 1, 10, 11 renders show correct sequential CONFIDENTIAL/Page X of Y burn-in and no cross-page content bleed.",
+  "passed": 7,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Live quotation preview is physically paginated as fixed A4 sheets",
+      "name": "quote-preview-a4-fixed-pagination",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created a tscheck quote (27 line items, long multi-sentence specs, 11% tax) via API and opened /quotes/{id}. 11 [data-pdf-page='true'] sheets rendered; every sheet measured ~793.7x1122.5px (210x297mm at 96dpi, tolerance 8px), had scrollWidth<=clientWidth and scrollHeight<=clientHeight (no overflow), and contained both the repeated 'PT. NASAKTION SOLUSI INDONESIA' header and a 'CONFIDENTIAL · Page X of Y' footer."
+    },
+    {
+      "criterion": "Downloaded PDF visually matches the rendered preview",
+      "name": "quote-download-pdf-matches-preview-pagecount",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created a tscheck quote (28 line items) via API, polled the live DOM until the dynamically-measured [data-pdf-page='true'] count stabilized at 11, then clicked Download PDF and parsed the saved file with pypdf: PDF page count also 11 (exact match) and each page's mediabox was 595.28x841.89pt (A4), confirming the direct-download DOM capture produces the same page count/sequence as the live preview."
+    },
+    {
+      "criterion": "Company logo is proportionally fitted and centered",
+      "name": "quote-logo-proportional-fit",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created a tscheck quote with a 1600x100px wide SVG data-URL logo via API. Rendered logo element measured width=240px, height=56px (both at/under the 240x56 caps), computed object-fit='contain' (no stretch/crop), its bottom edge (2098.09) stayed above the quote-title block's top edge (no collision), and its horizontal center matched the A4 page's horizontal center within 4px."
+    },
+    {
+      "criterion": "Long company identity cannot overlap customer content",
+      "name": "quote-address-no-overlap-customer",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created a tscheck quote via API with a 300+ character Indonesian legal address, long email and extended phone. Measured bounding boxes: supplier column right edge (624px) stayed left of the customer column left edge (656px) with no overlap; page scrollWidth (794) equalled clientWidth (794, no horizontal overflow); supplier column text stayed inside the page's right edge."
+    },
+    {
+      "criterion": "Downloaded typography matches the preview typography",
+      "name": "quote-fonts-load-and-capture-without-errors",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Opened a tscheck quote and read computed font-family after document.fonts.ready: heading='\"Sora Variable\", sans-serif', body='\"IBM Plex Sans\", sans-serif', data-label='\"JetBrains Mono Variable\", monospace' -- matching the required families. Triggered the direct-download DOM capture (html2canvas-pro -> jsPDF): no OKLCH/font/canvas console or page errors were emitted, and the resulting PDF was 843744 bytes (non-trivial, proving the capture completed from the loaded-font DOM)."
+    },
+    {
+      "criterion": "Customer PDF remains complete and safely named",
+      "name": "quote-download-filename-and-content-complete",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created a tscheck quote (26 items, wide logo, special characters in subject) via API. Download filename 'Q-COMPLETE-<ts>-Supply-of-API-6A-Valves-Fittings-Full-Release-<ts>.pdf' started with the quote number, ended '.pdf', and contained only safe [a-zA-Z0-9._-] characters. Saved PDF begins with the %PDF signature, has 11 pages matching the live DOM page count (commercial pages + Terms-and-Conditions + Customer-Acceptance), and every page's PyMuPDF pixmap had non-trivial raster content (no blank pages). Rendered page 1, 10 and 11 with PyMuPDF and visually confirmed: page 10 = 'Quotation Terms and Conditions' footer 'CONFIDENTIAL · Page 10 of 11', page 11 = 'Customer Acceptance' footer 'CONFIDENTIAL · Page 11 of 11', correct sequence and no bleed."
+    },
+    {
+      "criterion": "Downloaded PDF visually matches the rendered preview (public ingress cross-check)",
+      "name": "quote-download-pdf-public-preview-parity",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Ran against the public preview URL https://invoice-forge-67.preview.emergentagent.com. Created a tscheck quote (26 line items) via API, waited for the DOM [data-pdf-page='true'] count to stabilize at 8, downloaded the PDF and confirmed via PyMuPDF that the saved file also has 8 pages with a valid %PDF signature -- proving preview/PDF page-count parity holds through the public ingress path, not just localhost."
+    },
+    {
+      "criterion": "Release pack (quote) persistence -- regression guard for the PDF-engine change",
+      "name": "test_release_pack_persists_metadata_on_reopen",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /quotes with full release metadata (subject, customer_reference, delivery_point, lead_time, company_logo data-URL, quote_number, release_date, prepared_by_name/title, release_notes) returned 200/201; GET /quotes/{id} echoed all fields back unchanged. Confirms the data layer backing the PDF content was unaffected by the html2canvas-pro/jsPDF frontend swap."
+    }
+  ]
+}
