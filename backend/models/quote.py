@@ -7,12 +7,14 @@ from pydantic import BaseModel, Field
 
 LineCategory = Literal["sales", "rental", "service"]
 ChargeType = Literal["daily", "lump_sum"]
+SalesPricing = Literal["unit", "line_total"]
 
 
 class QuoteLineItemInput(BaseModel):
     description: str = Field(min_length=1)
     category: LineCategory
     charge_type: ChargeType
+    sales_pricing: SalesPricing = "unit"
     uom: str = Field(min_length=1, max_length=40)
     quantity: float = Field(gt=0)
     duration_days: float = Field(default=1, gt=0)

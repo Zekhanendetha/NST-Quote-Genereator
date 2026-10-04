@@ -1,10 +1,10 @@
 # QuoteForge living spec
 
-QuoteForge is a browser-based oil and gas commercial quotation workspace. It lets a user build sales, rental, and service quotes with daily or lump-sum charge bases, configurable UoM, multiple currencies, optional tax, payment terms, delivery lead time, editable supplier/client placeholders, and notes. Every saved quote is persisted in MongoDB and appears in release history.
+QuoteForge is a browser-based oil and gas commercial quotation workspace. It lets a user build sales, rental, and service quotes with configurable UoM, multiple currencies, optional tax, payment terms, delivery lead time, editable supplier/client placeholders, and notes. Rental and service lines use daily or lump-sum charge bases; sales lines use their own per-unit or line-total pricing option. Every saved quote is persisted in MongoDB and appears in release history.
 
 ## Data model
 - `Quote`: string id, quote number, issue date, status, supplier details, client details, currency, tax settings, terms, notes, line items, subtotal, cost, tax, grand total, gross profit, and margin percentage.
-- `QuoteLineItem`: description, category (`sales`, `rental`, `service`), charge type (`daily`, `lump_sum`), UoM, quantity, duration days, sell rate, cost rate, calculated line total and line cost.
+- `QuoteLineItem`: description, category (`sales`, `rental`, `service`), charge type (`daily`, `lump_sum`) for rental/service lines, sales pricing (`unit`, `line_total`) for sales lines, UoM, quantity, duration days, sell rate, cost rate, calculated line total and line cost.
 
 ## Key flows
 1. Dashboard (`/`) shows persistent quote history and aggregate revenue, cost, profit, and margin.

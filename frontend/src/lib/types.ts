@@ -1,10 +1,12 @@
 export type LineCategory = "sales" | "rental" | "service";
 export type ChargeType = "daily" | "lump_sum";
+export type SalesPricing = "unit" | "line_total";
 
 export interface QuoteLineItemInput {
   description: string;
   category: LineCategory;
   charge_type: ChargeType;
+  sales_pricing: SalesPricing;
   uom: string;
   quantity: number;
   duration_days: number;

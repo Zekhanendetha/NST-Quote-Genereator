@@ -15,9 +15,15 @@ def build_quote(payload: QuoteCreate) -> Quote:
     total_cost = 0.0
 
     for item in payload.line_items:
-        multiplier = item.duration_days if item.charge_type == "daily" else 1
-        line_total = round(item.quantity * item.sell_rate * multiplier, 2)
-        line_cost = round(item.quantity * item.cost_rate * multiplier, 2)
+        if item.category == "sales":
+            line_total = item.sell_rate if item.sales_pricing == "line_total" else item.quantity * item.sell_rate
+            line_cost = item.cost_rate if item.sales_pricing == "line_total" else item.quantity * item.cost_rate
+        else:
+            multiplier = item.duration_days if item.charge_type == "daily" else 1
+            line_total = item.quantity * item.sell_rate * multiplier
+            line_cost = item.quantity * item.cost_rate * multiplier
+        line_total = round(line_total, 2)
+        line_cost = round(line_cost, 2)
         subtotal += line_total
         total_cost += line_cost
         items.append(
