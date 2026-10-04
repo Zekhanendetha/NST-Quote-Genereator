@@ -10,7 +10,7 @@ import { generateQuotePdf } from "@/lib/generateQuotePdf";
 import { CURRENCIES, CATEGORY_LABELS, formatMoney, type ChargeType, type CompanyProfile, type LineCategory, type PriceMethod, type Quote, type QuoteLineItemInput, type QuotePayload, type SalesPricing } from "@/lib/types";
 
 const emptyItem = (): QuoteLineItemInput => ({ description: "", description_details: "", category: "service", charge_type: "daily", sales_pricing: "unit", uom: "day", quantity: 1, duration_days: 1, price_method: "sell_rate", sell_rate: 0, target_margin_percent: 0, cost_rate: 0, cost_addon_percent: 0 });
-const initialForm: QuotePayload = { quote_number: "", release_date: "", client_name: "", client_company: "", client_email: "", client_location: "", customer_reference: "", delivery_point: "", company_name: "", company_address: "", company_email: "", company_phone: "", company_logo: "", prepared_by_name: "", prepared_by_title: "", quote_title: "Commercial Quotation", subject: "", currency: "USD", usd_exchange_rate: 1, tax_enabled: false, tax_rate: 5, payment_terms: "30 days from invoice", lead_time: "To be confirmed", valid_days: 30, notes: "This quotation is subject to final scope confirmation and availability.", release_notes: "", commission_amount: 0, line_items: [emptyItem()] };
+const initialForm: QuotePayload = { quote_number: "", release_date: "", client_name: "", client_company: "", client_email: "", client_location: "", customer_reference: "", delivery_point: "", company_name: "", company_address: "", company_email: "", company_phone: "", company_logo: "", prepared_by_name: "", prepared_by_title: "", prepared_by_email: "", prepared_by_phone: "", quote_title: "Commercial Quotation", subject: "", currency: "USD", usd_exchange_rate: 1, tax_enabled: false, tax_rate: 5, payment_terms: "30 days from invoice", lead_time: "To be confirmed", valid_days: 30, notes: "This quotation is subject to final scope confirmation and availability.", release_notes: "", commission_amount: 0, line_items: [emptyItem()] };
 
 const lineValue = (item: QuoteLineItemInput, rate: number) => item.category === "sales"
   ? (item.sales_pricing === "line_total" ? rate : item.quantity * rate)
@@ -137,8 +137,8 @@ function takePageItems(items: PageLineItem[], capacity: number) {
 function paginateLineItems(items: QuoteLineItemInput[]) {
   const remaining = items.map((item, originalIndex) => ({ item, originalIndex }));
   const totalUnits = remaining.reduce((sum, entry) => sum + estimatedItemUnits(entry.item), 0);
-  if (totalUnits <= 5) return [remaining];
-  const pages: PageLineItem[][] = [takePageItems(remaining, Math.min(8, Math.max(1, totalUnits - 5)))];
+  if (totalUnits <= 7) return [remaining];
+  const pages: PageLineItem[][] = [takePageItems(remaining, Math.min(14, Math.max(1, totalUnits - 7)))];
   while (remaining.reduce((sum, entry) => sum + estimatedItemUnits(entry.item), 0) > 7) {
     const remainingUnits = remaining.reduce((sum, entry) => sum + estimatedItemUnits(entry.item), 0);
     pages.push(takePageItems(remaining, Math.min(14, Math.max(1, remainingUnits - 7))));
@@ -149,6 +149,24 @@ function paginateLineItems(items: QuoteLineItemInput[]) {
 
 function DocumentPageFooter({ pageNumber, pageCount }: { pageNumber: number; pageCount: number }) {
   return <div className="document-page-footer absolute inset-x-12 bottom-6 border-t border-slate-200 pt-2 text-center font-mono text-[9px] tracking-[0.12em] text-slate-400">CONFIDENTIAL · Page {pageNumber} of {pageCount}</div>;
+}
+
+function IntroductionDocumentPage({ form, reference, releaseDate, pageCount }: { form: QuotePayload; reference: string; releaseDate: string; pageCount: number }) {
+  return (
+    <section data-testid="print-preview" data-pdf-page="true" className="quotation-page print-document relative mx-auto mt-8 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)]">
+      <DocumentHeader form={form} reference={reference} releaseDate={releaseDate} prefix="preview" />
+      <div className="mt-5"><p className="data-label text-orange-600">Quotation introduction</p><h3 className="mt-2 font-heading text-xl font-bold tracking-tight">Introduction &amp; Correspondence</h3></div>
+      <div className="mt-5 grid grid-cols-2 gap-8 border-y border-slate-200 py-4 text-xs"><div className="min-w-0"><p data-testid="preview-supplier-name" className="font-semibold">{form.company_name}</p>{(form.company_address || form.company_email || form.company_phone) && <p className="mt-1 whitespace-pre-line break-words text-[10px] leading-4 text-slate-500">{form.company_address}{form.company_email && <><br />{form.company_email}</>}{form.company_phone && <><br />{form.company_phone}</>}</p>}</div><div className="min-w-0"><p className="data-label">Customer</p><p data-testid="preview-client-name" className="mt-1.5 break-words font-semibold">{form.client_company}</p><p className="mt-1 break-words text-[10px] leading-4 text-slate-500">Attn: {form.client_name}{form.client_location && <><br />{form.client_location}</>}{form.client_email && <><br />{form.client_email}</>}{form.customer_reference && <><br />Ref: {form.customer_reference}</>}{form.delivery_point && <><br />Delivery point: {form.delivery_point}</>}</p></div></div>
+      <div className="mt-5 space-y-4 text-xs leading-5 text-slate-600">
+        <p data-testid="preview-introduction"><strong className="text-slate-800">{form.company_name}</strong> is pleased to submit this quotation proposal regarding “{form.subject}” for your consideration and review. This proposal has been prepared based on the scope and requirements discussed and outlines our proposed solution, deliverables, and commercial terms for your evaluation.</p>
+        <p data-testid="preview-correspondence-wording">For the purpose of ensuring the timely and efficient handling of this matter, please address and direct all correspondence, inquiries, and related communications concerning the subject referenced above to the responsible party identified below.</p>
+      </div>
+      <div data-testid="preview-preparer-contact" className="mt-5 grid grid-cols-[130px_1fr] border border-slate-200 text-xs"><div className="border-b border-r border-slate-200 bg-slate-50 px-4 py-2 data-label text-slate-500">Name</div><div className="border-b border-slate-200 px-4 py-2 font-semibold">{form.prepared_by_name}</div><div className="border-b border-r border-slate-200 bg-slate-50 px-4 py-2 data-label text-slate-500">Designation</div><div className="border-b border-slate-200 px-4 py-2">{form.prepared_by_title}</div><div className="border-b border-r border-slate-200 bg-slate-50 px-4 py-2 data-label text-slate-500">E-Mail</div><div className="border-b border-slate-200 px-4 py-2">{form.prepared_by_email}</div><div className="border-r border-slate-200 bg-slate-50 px-4 py-2 data-label text-slate-500">Phone</div><div className="px-4 py-2">{form.prepared_by_phone}</div></div>
+      <p data-testid="preview-appreciation-wording" className="mt-5 text-xs leading-5 text-slate-600"><strong className="text-slate-800">{form.company_name}</strong> would like to express its sincere appreciation to <strong className="text-slate-800">{form.client_company}</strong> for the opportunity to submit this quotation. We value your consideration and look forward to the possibility of working with you. We would welcome your favorable response at your convenience.</p>
+      <div data-testid="preview-signature-block" className="mt-6 w-[44%] border border-slate-300 p-3 text-xs"><p className="font-semibold text-slate-700">Best Regards,</p><p className="mt-1 font-heading text-sm font-bold">{form.company_name}</p><div className="h-10" aria-label="Signature space" /><p data-testid="preview-prepared-by-name" className="border-t border-slate-400 pt-2 font-semibold text-slate-900">{form.prepared_by_name}</p><p data-testid="preview-prepared-by-title" className="mt-1 text-[9px] text-slate-500">{form.prepared_by_title}</p></div>
+      <DocumentPageFooter pageNumber={1} pageCount={pageCount} />
+    </section>
+  );
 }
 
 interface CommercialDocumentPageProps {
@@ -166,21 +184,17 @@ function CommercialDocumentPage({ form, entries, pageIndex, commercialPageCount,
   const firstPage = pageIndex === 0;
   const lastPage = pageIndex === commercialPageCount - 1;
   return (
-    <section data-testid={firstPage ? "print-preview" : `commercial-page-${pageIndex + 1}`} data-pdf-page="true" className="quotation-page print-document relative mx-auto mt-8 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)]">
-      <DocumentHeader form={form} reference={reference} releaseDate={releaseDate} prefix={firstPage ? "preview" : `commercial-header-${pageIndex + 1}`} />
-      {firstPage ? <>
-        <div className="grid grid-cols-2 gap-8 border-b border-slate-200 py-4 text-xs"><div className="min-w-0"><p data-testid="preview-supplier-name" className="font-semibold">{form.company_name}</p>{(form.company_address || form.company_email || form.company_phone) && <p className="mt-1 whitespace-pre-line break-words text-[10px] leading-4 text-slate-500">{form.company_address}{form.company_email && <><br />{form.company_email}</>}{form.company_phone && <><br />{form.company_phone}</>}</p>}</div><div className="min-w-0"><p className="data-label">Customer</p><p data-testid="preview-client-name" className="mt-1.5 break-words font-semibold">{form.client_company}</p><p className="mt-1 break-words text-[10px] leading-4 text-slate-500">Attn: {form.client_name}{form.client_location && <><br />{form.client_location}</>}{form.client_email && <><br />{form.client_email}</>}{form.customer_reference && <><br />Ref: {form.customer_reference}</>}{form.delivery_point && <><br />Delivery point: {form.delivery_point}</>}</p></div></div>
-        <p data-testid="preview-introduction" className="mt-4 text-xs leading-5 text-slate-600"><strong className="text-slate-800">{form.company_name}</strong> is pleased to submit this quotation proposal regarding “{form.subject}” for your consideration and review. This proposal has been prepared based on the scope and requirements discussed and outlines our proposed solution, deliverables, and commercial terms for your evaluation.</p>
-      </> : <p className="mt-4 data-label text-orange-600">Commercial schedule · Continued</p>}
+    <section data-testid={`commercial-page-${pageIndex + 1}`} data-pdf-page="true" className="quotation-page print-document relative mx-auto mt-8 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)]">
+      <DocumentHeader form={form} reference={reference} releaseDate={releaseDate} prefix={`commercial-header-${pageIndex + 1}`} />
+      <div className="mt-5"><p className="data-label text-orange-600">{firstPage ? "Commercial pricing" : "Commercial schedule · Continued"}</p><h3 className="mt-2 font-heading text-xl font-bold tracking-tight">Commercial Section{firstPage ? "" : ` · ${pageIndex + 1}`}</h3></div>
       <table className="mt-4 w-full table-fixed text-left text-xs"><thead><tr className="border-b border-slate-900"><th className="w-[32%] pb-2 data-label">Description</th><th className="w-[14%] pb-2 data-label">Type / basis</th><th className="w-[9%] pb-2 text-right data-label">Qty</th><th className="w-[11%] pb-2 text-right data-label">UoM</th><th className="w-[17%] pb-2 text-right data-label">Item price</th><th className="w-[17%] pb-2 text-right data-label">Line amount</th></tr></thead><tbody>{entries.map(({ item, originalIndex }) => <QuotationLineRow key={originalIndex} item={item} index={originalIndex} currency={form.currency} commissionPerLine={totals.commissionPerLine} />)}</tbody></table>
       {lastPage && <>
         <div className="ml-auto mt-4 max-w-[260px] space-y-1.5 text-xs"><div className="flex justify-between"><span className="text-slate-500">Subtotal</span><span className="font-mono">{formatMoney(totals.subtotal, form.currency)}</span></div><div className="flex justify-between"><span className="text-slate-500">Tax</span><span className="font-mono">{formatMoney(totals.tax, form.currency)}</span></div><div className="flex justify-between border-t-2 border-slate-900 pt-2 text-sm font-bold"><span>TOTAL</span><span data-testid="preview-total" className="font-mono text-orange-700">{formatMoney(totals.total, form.currency)}</span></div></div>
         <div className="mt-6 grid grid-cols-2 gap-8 border-t border-slate-200 pt-4 text-[10px] text-slate-500"><p><span className="font-semibold text-slate-700">Payment:</span> {form.payment_terms}</p><p><span className="font-semibold text-slate-700">Delivery:</span> {form.lead_time}</p></div>
         {form.notes && <p data-testid="preview-notes" className="mt-3 whitespace-pre-line text-[10px] leading-4 text-slate-400">{form.notes}</p>}
         {form.release_notes && <div data-testid="preview-release-notes" className="mt-4 border-l-2 border-orange-500 bg-orange-50 px-3 py-2"><p className="data-label text-orange-700">Release note</p><p className="mt-1.5 whitespace-pre-line text-[10px] leading-4 text-slate-600">{form.release_notes}</p></div>}
-        <div data-testid="preview-signature-block" className="mt-5 w-[44%] border border-slate-300 p-3 text-xs"><p className="font-semibold text-slate-700">Best Regards,</p><p className="mt-1 font-heading text-sm font-bold">{form.company_name}</p><div className="h-9" aria-label="Signature space" /><p data-testid="preview-prepared-by-name" className="border-t border-slate-400 pt-2 font-semibold text-slate-900">{form.prepared_by_name}</p><p data-testid="preview-prepared-by-title" className="mt-1 text-[9px] text-slate-500">{form.prepared_by_title}</p></div>
       </>}
-      <DocumentPageFooter pageNumber={pageIndex + 1} pageCount={totalPageCount} />
+      <DocumentPageFooter pageNumber={pageIndex + 2} pageCount={totalPageCount} />
     </section>
   );
 }
@@ -218,7 +232,7 @@ export default function QuoteBuilder() {
     return { subtotal, baseSubtotal, cost, tax, total: subtotal + tax, profit, margin: subtotal ? profit / subtotal * 100 : 0, commissionPerLine };
   }, [form]);
   const commercialPages = useMemo(() => paginateLineItems(form.line_items), [form.line_items]);
-  const documentPageCount = commercialPages.length + 2;
+  const documentPageCount = commercialPages.length + 3;
   const documentReference = form.quote_number || quoteQuery.data?.quote_number || "DRAFT / PREVIEW";
   const documentReleaseDate = form.release_date || quoteQuery.data?.release_date || quoteQuery.data?.issue_date || "Select date";
 
@@ -233,9 +247,9 @@ export default function QuoteBuilder() {
   });
 
   const canSave = form.client_name.trim() && form.client_company.trim() && form.company_name.trim() && (form.currency === "USD" || (form.usd_exchange_rate ?? 0) > 0) && form.line_items.length > 0 && form.line_items.every((item) => item.description.trim() && item.uom.trim());
-  const canPrint = Boolean(canSave && form.subject.trim() && form.prepared_by_name.trim() && form.prepared_by_title.trim() && documentReference !== "DRAFT / PREVIEW" && documentReleaseDate !== "Select date");
-  const printQuote = () => { if (!canPrint) { toast.error("Save the quotation and complete its subject, release date, preparer, and title before PDF release."); return; } const originalTitle = document.title; document.title = ""; window.print(); document.title = originalTitle; };
-  const downloadPdf = async () => { if (!canPrint) { toast.error("Save the quotation and complete its release details before downloading PDF."); return; } setIsDownloading(true); try { const pages = Array.from(document.querySelectorAll<HTMLElement>("[data-pdf-page='true']")); const filename = await generateQuotePdf({ pages, quoteNumber: documentReference, subject: form.subject, companyName: form.company_name }); toast.success(`Downloaded ${filename}`); } catch { toast.error("Unable to generate the PDF. Please try Print / PDF instead."); } finally { setIsDownloading(false); } };
+  const canPrint = Boolean(canSave && form.subject.trim() && form.prepared_by_name.trim() && form.prepared_by_title.trim() && form.prepared_by_email.trim() && form.prepared_by_phone.trim() && documentReference !== "DRAFT / PREVIEW" && documentReleaseDate !== "Select date");
+  const printQuote = () => { if (!canPrint) { toast.error("Save the quotation and complete subject, release date, and all preparer contact fields before PDF release."); return; } const originalTitle = document.title; document.title = ""; window.print(); document.title = originalTitle; };
+  const downloadPdf = async () => { if (!canPrint) { toast.error("Save the quotation and complete subject, release date, and all preparer contact fields before downloading PDF."); return; } setIsDownloading(true); try { const pages = Array.from(document.querySelectorAll<HTMLElement>("[data-pdf-page='true']")); const filename = await generateQuotePdf({ pages, quoteNumber: documentReference, subject: form.subject, companyName: form.company_name }); toast.success(`Downloaded ${filename}`); } catch { toast.error("Unable to generate the PDF. Please try Print / PDF instead."); } finally { setIsDownloading(false); } };
 
   return (
     <div className="min-h-svh bg-[#f4f4f5] text-slate-950">
@@ -270,7 +284,8 @@ export default function QuoteBuilder() {
               <p className="mt-2 text-sm text-slate-500">Company branding is managed once from Workspace.</p>
               <div className="mt-5 space-y-4">
                 <div className="grid grid-cols-2 gap-3"><Field label="Quotation number" testId="quote-number"><TextInput testId="quote-number-input" value={form.quote_number} onChange={(value) => updateForm("quote_number", value)} placeholder="Auto-generated if blank" /></Field><Field label="Release date" testId="release-date"><input data-testid="release-date-input" type="date" value={form.release_date} onChange={(event) => updateForm("release_date", event.target.value)} className="w-full border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></Field></div>
-                <div className="grid grid-cols-2 gap-3"><Field label="Prepared by" testId="prepared-by-name"><TextInput testId="prepared-by-name-input" value={form.prepared_by_name} onChange={(value) => updateForm("prepared_by_name", value)} placeholder="Full name" /></Field><Field label="Title" testId="prepared-by-title"><TextInput testId="prepared-by-title-input" value={form.prepared_by_title} onChange={(value) => updateForm("prepared_by_title", value)} placeholder="Commercial Manager" /></Field></div>
+                <div className="grid grid-cols-2 gap-3"><Field label="Prepared by *" testId="prepared-by-name"><TextInput testId="prepared-by-name-input" value={form.prepared_by_name} onChange={(value) => updateForm("prepared_by_name", value)} placeholder="Full name" /></Field><Field label="Designation *" testId="prepared-by-title"><TextInput testId="prepared-by-title-input" value={form.prepared_by_title} onChange={(value) => updateForm("prepared_by_title", value)} placeholder="Commercial Manager" /></Field></div>
+                <div className="grid grid-cols-2 gap-3"><Field label="Preparer email *" testId="prepared-by-email"><TextInput testId="prepared-by-email-input" value={form.prepared_by_email} onChange={(value) => updateForm("prepared_by_email", value)} placeholder="name@company.com" /></Field><Field label="Preparer phone *" testId="prepared-by-phone"><TextInput testId="prepared-by-phone-input" value={form.prepared_by_phone} onChange={(value) => updateForm("prepared_by_phone", value)} placeholder="+62 ..." /></Field></div>
                 <Field label="Terms / exclusions" testId="quote-notes"><textarea data-testid="quote-notes-input" value={form.notes} onChange={(event) => updateForm("notes", event.target.value)} rows={3} className="w-full resize-none border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></Field>
                 <Field label="Release note" testId="release-notes"><textarea data-testid="release-notes-input" value={form.release_notes} onChange={(event) => updateForm("release_notes", event.target.value)} rows={3} placeholder="Add a message, clarification, or release note for the customer…" className="w-full resize-none border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-slate-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></Field>
               </div>
@@ -280,6 +295,7 @@ export default function QuoteBuilder() {
           </aside>
         </div>
 
+        <IntroductionDocumentPage form={form} reference={documentReference} releaseDate={documentReleaseDate} pageCount={documentPageCount} />
         {commercialPages.map((entries, pageIndex) => <CommercialDocumentPage key={pageIndex} form={form} entries={entries} pageIndex={pageIndex} commercialPageCount={commercialPages.length} totalPageCount={documentPageCount} reference={documentReference} releaseDate={documentReleaseDate} totals={totals} />)}
 
         <section data-testid="terms-page" data-pdf-page="true" className="quotation-page print-document relative mx-auto mt-8 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)]">
@@ -294,7 +310,7 @@ export default function QuoteBuilder() {
             <div data-testid="terms-change-order" className="grid grid-cols-[150px_1fr] gap-5 py-3"><p className="data-label text-slate-500">Change to Order</p><p className="leading-5 text-slate-700">Any changes to specifications, quantity, or delivery schedule after order confirmation may result in adjustments to price and delivery lead time.</p></div>
           </div>
           <p className="mt-6 text-[10px] leading-4 text-slate-400">These Terms and Conditions form an integral part of quotation {documentReference}.</p>
-          <DocumentPageFooter pageNumber={commercialPages.length + 1} pageCount={documentPageCount} />
+          <DocumentPageFooter pageNumber={commercialPages.length + 2} pageCount={documentPageCount} />
         </section>
 
         <section data-testid="acceptance-page" data-pdf-page="true" className="quotation-page print-document relative mx-auto mt-8 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)]">
@@ -304,7 +320,7 @@ export default function QuoteBuilder() {
           <div className="mt-6 border border-slate-200 p-4"><p className="data-label text-slate-500">For and on Behalf of</p><p data-testid="acceptance-customer-name" className="mt-2 font-heading text-xl font-bold text-slate-900">{form.client_company || "Customer Name"}</p></div>
           <div className="mt-8 grid grid-cols-2 gap-x-10 gap-y-8 text-xs"><div><p className="data-label text-slate-400">Name</p><div className="mt-7 border-b border-slate-500" /></div><div><p className="data-label text-slate-400">Designation</p><div className="mt-7 border-b border-slate-500" /></div><div><p className="data-label text-slate-400">Date</p><div className="mt-7 border-b border-slate-500" /></div><div><p className="data-label text-slate-400">Signature</p><div className="mt-7 border-b border-slate-500" /></div></div>
           <div className="mt-10 border-t border-slate-200 pt-4 text-[10px] text-slate-400"><p>Quotation reference: <span className="font-mono text-slate-600">{documentReference}</span></p><p className="mt-1">Release date: {documentReleaseDate}</p></div>
-          <DocumentPageFooter pageNumber={commercialPages.length + 2} pageCount={documentPageCount} />
+          <DocumentPageFooter pageNumber={commercialPages.length + 3} pageCount={documentPageCount} />
         </section>
       </main>
     </div>

@@ -45,6 +45,8 @@ export interface QuotePayload {
   company_logo: string;
   prepared_by_name: string;
   prepared_by_title: string;
+  prepared_by_email: string;
+  prepared_by_phone: string;
   quote_title: string;
   subject: string;
   currency: string;

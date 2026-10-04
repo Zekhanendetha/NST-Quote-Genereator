@@ -43,6 +43,8 @@ class QuoteCreate(BaseModel):
     company_logo: str = Field(default="", max_length=1_500_000)
     prepared_by_name: str = ""
     prepared_by_title: str = ""
+    prepared_by_email: str = ""
+    prepared_by_phone: str = ""
     quote_title: str = "Commercial Quotation"
     subject: str = ""
     currency: str = Field(default="USD", min_length=3, max_length=3)
@@ -88,6 +90,8 @@ class Quote(BaseModel):
     company_logo: str = ""
     prepared_by_name: str = ""
     prepared_by_title: str = ""
+    prepared_by_email: str = ""
+    prepared_by_phone: str = ""
     quote_title: str
     subject: str = ""
     currency: str
