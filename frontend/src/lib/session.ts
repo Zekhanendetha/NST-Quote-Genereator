@@ -1,19 +1,15 @@
-// Session boundary: auth is an httpOnly cookie the backend owns; the frontend's one
-// duty is wiping the react-query cache so one account's data never renders for the next.
+// Clear user-specific cached data at Microsoft sign-in boundaries.
 import { queryClient } from "./queryClient";
-import { apiPost } from "./api";
+import { msalInstance } from "./entra";
 
 // Call after every successful login/signup.
 export function beginSession(): void {
   queryClient.clear();
 }
 
-// Call from every sign-out control; the hard redirect resets all in-memory state.
-export async function endSession(redirectTo: string = "/login"): Promise<void> {
-  try {
-    await apiPost("/auth/logout");
-  } finally {
-    queryClient.clear();
-    window.location.assign(redirectTo);
-  }
+// MSAL ends the Entra browser session; the API does not keep a server-side cookie session.
+export async function endSession(): Promise<void> {
+  queryClient.clear();
+  const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
+  await msalInstance.logoutRedirect({ account, postLogoutRedirectUri: window.location.origin });
 }

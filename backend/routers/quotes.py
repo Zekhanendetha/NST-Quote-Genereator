@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pymongo import ReturnDocument
 
+from lib.auth import ADMIN_ROLE, EDITOR_ROLE, require_any_role
 from lib.db import db
 from lib.dates import today_iso
 from models.quote import Quote, QuoteCreate, QuoteLineItem, QuoteStatusUpdate
@@ -79,20 +80,20 @@ def build_quote(payload: QuoteCreate) -> Quote:
     )
 
 
-@router.get("", response_model=list[Quote])
+@router.get("", response_model=list[Quote], dependencies=[Depends(require_any_role(ADMIN_ROLE, EDITOR_ROLE))])
 async def list_quotes():
     documents = await db.quotes.find().sort("created_at", -1).to_list(1000)
     return [Quote(**document) for document in documents]
 
 
-@router.post("", response_model=Quote)
+@router.post("", response_model=Quote, dependencies=[Depends(require_any_role(ADMIN_ROLE, EDITOR_ROLE))])
 async def create_quote(payload: QuoteCreate):
     quote = build_quote(payload)
     await db.quotes.insert_one(quote.model_dump())
     return quote
 
 
-@router.put("/{quote_id}", response_model=Quote)
+@router.put("/{quote_id}", response_model=Quote, dependencies=[Depends(require_any_role(ADMIN_ROLE, EDITOR_ROLE))])
 async def update_quote(quote_id: str, payload: QuoteCreate):
     existing = await db.quotes.find_one({"id": quote_id})
     if not existing:
@@ -110,7 +111,7 @@ async def update_quote(quote_id: str, payload: QuoteCreate):
     return quote
 
 
-@router.get("/{quote_id}", response_model=Quote)
+@router.get("/{quote_id}", response_model=Quote, dependencies=[Depends(require_any_role(ADMIN_ROLE, EDITOR_ROLE))])
 async def get_quote(quote_id: str):
     document = await db.quotes.find_one({"id": quote_id})
     if not document:
@@ -118,7 +119,7 @@ async def get_quote(quote_id: str):
     return Quote(**document)
 
 
-@router.patch("/{quote_id}/status", response_model=Quote)
+@router.patch("/{quote_id}/status", response_model=Quote, dependencies=[Depends(require_any_role(ADMIN_ROLE, EDITOR_ROLE))])
 async def update_quote_status(quote_id: str, payload: QuoteStatusUpdate):
     result = await db.quotes.find_one_and_update(
         {"id": quote_id},
@@ -130,7 +131,7 @@ async def update_quote_status(quote_id: str, payload: QuoteStatusUpdate):
     return Quote(**result)
 
 
-@router.delete("/{quote_id}", status_code=204)
+@router.delete("/{quote_id}", status_code=204, dependencies=[Depends(require_any_role(ADMIN_ROLE))])
 async def delete_quote(quote_id: str):
     result = await db.quotes.delete_one({"id": quote_id})
     if result.deleted_count == 0:
