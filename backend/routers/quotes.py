@@ -29,6 +29,8 @@ def build_quote(payload: QuoteCreate) -> Quote:
         base_total = base_line_value(item, item.sell_rate)
         base_cost = base_line_value(item, item.cost_rate)
         cost_addon_amount = round(base_cost * item.cost_addon_percent / 100, 2)
+        if item.price_method == "margin":
+            base_total = (base_cost + cost_addon_amount) / (1 - item.target_margin_percent / 100)
         line_total = base_total + commission_allocation
         line_cost = base_cost + cost_addon_amount
         subtotal += line_total

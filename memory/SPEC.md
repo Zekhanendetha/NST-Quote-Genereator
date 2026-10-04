@@ -4,7 +4,7 @@ QuoteForge is a browser-based oil and gas commercial quotation workspace. It let
 
 ## Data model
 - `Quote`: string id, quote number, issue date, status, supplier details, client details, currency, tax settings, terms, notes, quote-level commission, line items, subtotal, cost, tax, grand total, gross profit, and margin percentage. Commission is divided equally across all line items and included in their client-facing prices.
-- `QuoteLineItem`: description, category (`sales`, `rental`, `service`), charge type (`daily`, `lump_sum`) for rental/service lines, sales pricing (`unit`, `line_total`) for sales lines, UoM, quantity, duration days, sell rate, cost rate, cost added value percentage, calculated cost add-on, commission allocation, line total and line cost. Cost added value increases internal cost basis for government tax, landing cost, and similar charges.
+- `QuoteLineItem`: description plus printable detailed specification, category (`sales`, `rental`, `service`), charge type (`daily`, `lump_sum`) for rental/service lines, sales pricing (`unit`, `line_total`) for sales lines, UoM, quantity, duration days, price method (`sell_rate`, `margin`), direct sell rate or target gross margin percentage, cost rate, cost added value percentage, calculated cost add-on, commission allocation, line total and line cost. Margin pricing derives the sell value from fully loaded cost using `loaded cost / (1 - margin %)`. Cost added value increases internal cost basis for government tax, landing cost, and similar charges.
 
 ## Key flows
 1. Dashboard (`/`) shows persistent quote history and aggregate revenue, cost, profit, and margin.

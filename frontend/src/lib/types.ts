@@ -1,16 +1,20 @@
 export type LineCategory = "sales" | "rental" | "service";
 export type ChargeType = "daily" | "lump_sum";
 export type SalesPricing = "unit" | "line_total";
+export type PriceMethod = "sell_rate" | "margin";
 
 export interface QuoteLineItemInput {
   description: string;
+  description_details: string;
   category: LineCategory;
   charge_type: ChargeType;
   sales_pricing: SalesPricing;
   uom: string;
   quantity: number;
   duration_days: number;
+  price_method: PriceMethod;
   sell_rate: number;
+  target_margin_percent: number;
   cost_rate: number;
   cost_addon_percent: number;
 }
