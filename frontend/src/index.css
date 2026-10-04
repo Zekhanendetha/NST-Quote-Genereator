@@ -146,16 +146,38 @@
 
 .quotation-page {
   font-size: 0.75rem;
+  box-sizing: border-box;
+  width: min(100%, 210mm);
+  min-height: 297mm;
+  padding: 12mm;
+  overflow: visible;
 }
 
 .quotation-page .data-label {
   font-size: 0.55rem;
 }
 
+@page {
+  size: A4 portrait;
+  margin: 10mm 10mm 16mm;
+
+  @bottom-center {
+    content: "CONFIDENTIAL  ·  Page " counter(page) " of " counter(pages);
+    color: #64748b;
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 8pt;
+    letter-spacing: 0.08em;
+  }
+}
+
 @media print {
-  @page { size: A4; margin: 12mm; }
-  body { background: white !important; }
-  .print-document { display: block !important; margin: 0 !important; max-width: none !important; padding: 0 !important; box-shadow: none !important; }
+  html, body { width: 210mm; margin: 0 !important; background: white !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  main { width: auto !important; max-width: none !important; margin: 0 !important; padding: 0 !important; }
+  .print-document { display: block !important; width: auto !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; overflow: visible !important; }
   .quotation-page { break-after: page; page-break-after: always; }
   .quotation-page:last-of-type { break-after: auto; page-break-after: auto; }
+  .quotation-page thead { display: table-header-group; }
+  .quotation-page tr,
+  .quotation-page [data-testid="preview-signature-block"],
+  .quotation-page [data-testid="preview-release-notes"] { break-inside: avoid; page-break-inside: avoid; }
 }
