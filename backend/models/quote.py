@@ -28,6 +28,8 @@ class QuoteLineItemInput(BaseModel):
 
 
 class QuoteCreate(BaseModel):
+    quote_number: str = Field(default="", max_length=80)
+    release_date: str = Field(default="", max_length=10)
     client_name: str = Field(min_length=1)
     client_company: str = Field(min_length=1)
     client_email: str = ""
@@ -36,6 +38,9 @@ class QuoteCreate(BaseModel):
     company_address: str = ""
     company_email: str = ""
     company_phone: str = ""
+    company_logo: str = Field(default="", max_length=1_500_000)
+    prepared_by_name: str = ""
+    prepared_by_title: str = ""
     quote_title: str = "Commercial Quotation"
     currency: str = Field(default="USD", min_length=3, max_length=3)
     tax_enabled: bool = False
@@ -44,6 +49,7 @@ class QuoteCreate(BaseModel):
     lead_time: str = "To be confirmed"
     valid_days: int = Field(default=30, ge=1, le=365)
     notes: str = ""
+    release_notes: str = ""
     commission_amount: float = Field(default=0, ge=0)
     line_items: list[QuoteLineItemInput] = Field(min_length=1)
 
@@ -63,6 +69,7 @@ class Quote(BaseModel):
     quote_number: str
     status: Literal["draft", "issued"] = "draft"
     issue_date: str
+    release_date: str = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     client_name: str
     client_company: str
@@ -72,6 +79,9 @@ class Quote(BaseModel):
     company_address: str
     company_email: str
     company_phone: str
+    company_logo: str = ""
+    prepared_by_name: str = ""
+    prepared_by_title: str = ""
     quote_title: str
     currency: str
     tax_enabled: bool
@@ -80,6 +90,7 @@ class Quote(BaseModel):
     lead_time: str
     valid_days: int
     notes: str
+    release_notes: str = ""
     line_items: list[QuoteLineItem]
     subtotal: float
     total_cost: float

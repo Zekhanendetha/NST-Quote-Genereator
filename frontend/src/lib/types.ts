@@ -30,6 +30,8 @@ export interface QuoteLineItem extends QuoteLineItemInput {
 }
 
 export interface QuotePayload {
+  quote_number: string;
+  release_date: string;
   client_name: string;
   client_company: string;
   client_email: string;
@@ -38,6 +40,9 @@ export interface QuotePayload {
   company_address: string;
   company_email: string;
   company_phone: string;
+  company_logo: string;
+  prepared_by_name: string;
+  prepared_by_title: string;
   quote_title: string;
   currency: string;
   tax_enabled: boolean;
@@ -46,13 +51,13 @@ export interface QuotePayload {
   lead_time: string;
   valid_days: number;
   notes: string;
+  release_notes: string;
   commission_amount: number;
   line_items: QuoteLineItemInput[];
 }
 
 export interface Quote extends QuotePayload {
   id: string;
-  quote_number: string;
   status: "draft" | "issued";
   issue_date: string;
   created_at: string;

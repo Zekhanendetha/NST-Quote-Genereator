@@ -56,10 +56,12 @@ def build_quote(payload: QuoteCreate) -> Quote:
     gross_profit = round(subtotal - total_cost, 2)
     margin_percent = round((gross_profit / subtotal) * 100, 1) if subtotal else 0
 
+    release_date = payload.release_date or today_iso()
+    quote_number = payload.quote_number.strip() or f"Q-{datetime.now(timezone.utc).strftime('%Y')}-{datetime.now(timezone.utc).strftime('%m%d')}-{datetime.now(timezone.utc).strftime('%H%M%S')}"
     return Quote(
-        **payload.model_dump(exclude={"line_items"}),
-        quote_number=f"Q-{datetime.now(timezone.utc).strftime('%Y')}-{datetime.now(timezone.utc).strftime('%m%d')}-{datetime.now(timezone.utc).strftime('%H%M%S')}",
-        issue_date=today_iso(),
+        **payload.model_dump(exclude={"line_items", "quote_number"}),
+        quote_number=quote_number,
+        issue_date=release_date,
         created_at=datetime.now(timezone.utc),
         line_items=items,
         subtotal=subtotal,
@@ -92,8 +94,11 @@ async def update_quote(quote_id: str, payload: QuoteCreate):
         raise HTTPException(status_code=404, detail="Quote not found")
     quote = build_quote(payload)
     quote.id = quote_id
-    quote.quote_number = existing.get("quote_number", quote.quote_number)
-    quote.issue_date = existing.get("issue_date", quote.issue_date)
+    if not payload.quote_number.strip():
+        quote.quote_number = existing.get("quote_number", quote.quote_number)
+    if not payload.release_date:
+        quote.release_date = existing.get("release_date") or existing.get("issue_date", quote.release_date)
+        quote.issue_date = quote.release_date
     quote.created_at = existing.get("created_at", quote.created_at)
     quote.status = existing.get("status", "draft")
     await db.quotes.replace_one({"id": quote_id}, quote.model_dump())
