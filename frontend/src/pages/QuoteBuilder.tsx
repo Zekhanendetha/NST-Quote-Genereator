@@ -53,12 +53,14 @@ interface LineItemEditorProps {
   commissionPerLine: number;
   itemCount: number;
   isLast: boolean;
+  expanded: boolean;
   onUpdate: (key: keyof QuoteLineItemInput, value: string | number) => void;
   onRemove: () => void;
   onAddNext: () => void;
+  onToggle: () => void;
 }
 
-function LineItemEditor({ item, index, currency, builderMode, commissionPerLine, itemCount, isLast, onUpdate, onRemove, onAddNext }: LineItemEditorProps) {
+function LineItemEditor({ item, index, currency, builderMode, commissionPerLine, itemCount, isLast, expanded, onUpdate, onRemove, onAddNext, onToggle }: LineItemEditorProps) {
   const baseCost = lineValue(item, item.cost_rate);
   const costAddon = baseCost * item.cost_addon_percent / 100;
   const quotedLineTotal = (builderMode === "quote_only" ? lineValue(item, item.sell_rate) : quotedBaseValue(item)) + commissionPerLine;
@@ -75,9 +77,10 @@ function LineItemEditor({ item, index, currency, builderMode, commissionPerLine,
     <div data-testid={`line-item-card-${index}`} onKeyDown={handleQuickAdd} className="border border-slate-200 bg-slate-50/60 p-4 transition-colors hover:border-orange-200">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2"><span className="grid h-6 w-6 place-items-center bg-slate-900 font-mono text-xs text-white">{String(index + 1).padStart(2, "0")}</span><span data-testid={`line-item-label-${index}`} className="data-label text-slate-500">Pricing line</span></div>
-        <button type="button" data-testid={`remove-line-item-button-${index}`} onClick={onRemove} disabled={itemCount === 1} className="p-1 text-slate-400 transition-colors hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30" aria-label="Remove line item"><Trash2 size={15} /></button>
+        <div className="flex items-center gap-2"><button type="button" data-testid={`line-item-toggle-button-${index}`} aria-expanded={expanded} onClick={onToggle} className="inline-flex h-7 items-center gap-1 border border-slate-200 bg-white px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:border-orange-400 hover:text-orange-700">{expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}{expanded ? "Hide" : "Show"}</button><button type="button" data-testid={`remove-line-item-button-${index}`} onClick={onRemove} disabled={itemCount === 1} className="p-1 text-slate-400 transition-colors hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30" aria-label="Remove line item"><Trash2 size={15} /></button></div>
       </div>
 
+      {!expanded ? <div data-testid={`line-item-collapsed-summary-${index}`} className="grid grid-cols-2 gap-px border border-slate-200 bg-slate-200 sm:grid-cols-5"><div className="bg-white p-3 sm:col-span-1"><span className="data-label text-slate-400">Description</span><span data-testid={`line-item-summary-description-${index}`} className="mt-2 block truncate text-sm font-semibold text-slate-800">{item.description || "—"}</span></div><div className="bg-white p-3"><span className="data-label text-slate-400">Category</span><span data-testid={`line-item-summary-category-${index}`} className="mt-2 block text-sm font-semibold text-slate-700">{CATEGORY_LABELS[item.category]}</span></div><div className="bg-white p-3"><span className="data-label text-slate-400">UoM</span><span data-testid={`line-item-summary-uom-${index}`} className="mt-2 block text-sm uppercase text-slate-700">{item.uom}</span></div><div className="bg-white p-3"><span className="data-label text-slate-400">Qty</span><span data-testid={`line-item-summary-quantity-${index}`} className="mt-2 block font-mono text-sm font-semibold text-slate-700">{item.quantity}</span></div><div className="bg-orange-50 p-3"><span className="data-label text-orange-700">Quoted line total</span><span data-testid={`line-item-total-${index}`} className="mt-2 block font-mono text-sm font-bold text-orange-700">{formatMoney(quotedLineTotal, currency)}</span></div></div> : <>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
         <Field label="Description · quick add" testId={`line-item-description-${index}`} className="md:col-span-5"><TextInput testId={`line-item-description-input-${index}`} value={item.description} onChange={(value) => onUpdate("description", value)} placeholder="e.g. Wellhead pressure control package" /></Field>
         <Field label="Category" testId={`line-item-category-${index}`} className="md:col-span-3"><select data-testid={`line-item-category-select-${index}`} value={item.category} onChange={(event) => onUpdate("category", event.target.value as LineCategory)} className="w-full border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100">{(Object.keys(CATEGORY_LABELS) as LineCategory[]).map((category) => <option key={category} value={category}>{CATEGORY_LABELS[category]}</option>)}</select></Field>
@@ -104,6 +107,7 @@ function LineItemEditor({ item, index, currency, builderMode, commissionPerLine,
 
       {builderMode === "quote_only" ? <div className="mt-4 grid grid-cols-3 gap-3 border-t border-slate-200 pt-3 text-xs"><div><span className="block text-slate-500">Item sell amount</span><span data-testid={`line-item-base-sell-${index}`} className="mt-1 block font-mono font-semibold">{formatMoney(lineValue(item, item.sell_rate), currency)}</span></div><div><span className="block text-slate-500">Commission share</span><span data-testid={`line-item-commission-${index}`} className="mt-1 block font-mono font-semibold text-orange-700">+ {formatMoney(commissionPerLine, currency)}</span></div><div className="text-right"><span className="block text-slate-500">Quoted line total</span><span data-testid={`line-item-total-${index}`} className="mt-1 block font-mono font-bold text-slate-900">{formatMoney(quotedLineTotal, currency)}</span></div></div> : <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200 pt-3 text-xs sm:grid-cols-4"><div><span className="block text-slate-500">Base cost</span><span data-testid={`line-item-base-cost-${index}`} className="mt-1 block font-mono font-semibold">{formatMoney(baseCost, currency)}</span></div><div><span className="block text-slate-500">Cost add-on</span><span data-testid={`line-item-cost-addon-amount-${index}`} className="mt-1 block font-mono font-semibold">{formatMoney(costAddon, currency)}</span></div><div><span className="block text-slate-500">Commission share</span><span data-testid={`line-item-commission-${index}`} className="mt-1 block font-mono font-semibold text-orange-700">+ {formatMoney(commissionPerLine, currency)}</span></div><div className="text-right"><span className="block text-slate-500">Quoted line total</span><span data-testid={`line-item-total-${index}`} className="mt-1 block font-mono font-bold text-slate-900">{formatMoney(quotedLineTotal, currency)}</span></div></div>}
       {isLast && <p data-testid={`line-item-enter-hint-${index}`} className="mt-3 text-right text-[10px] text-slate-400">{builderMode === "quote_only" ? "Complete Description, Quantity, and Sell Price — then press Enter to add the next item." : "Complete Description, Quantity, Sell Rate/Margin, and Cost — then press Enter to add the next item."}</p>}
+      </>}
     </div>
   );
 }
@@ -251,6 +255,7 @@ export default function QuoteBuilder() {
   const [missingFieldsOpen, setMissingFieldsOpen] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(true);
   const [sectionVisibility, setSectionVisibility] = useState(defaultSectionVisibility);
+  const [expandedItems, setExpandedItems] = useState<boolean[]>([true]);
   const quoteQuery = useQuery({ queryKey: ["quote", id], queryFn: () => fetchQuote(id as string), enabled: Boolean(id), retry: false });
   const profileQuery = useQuery({ queryKey: ["company-profile"], queryFn: fetchCompanyProfile, retry: false });
 
@@ -258,6 +263,7 @@ export default function QuoteBuilder() {
     if (quoteQuery.data) {
       const saved = quoteQuery.data;
       setForm({ ...saved, line_items: saved.line_items.map(({ id: _id, line_total: _total, line_cost: _cost, base_total: _baseTotal, base_cost: _baseCost, cost_addon_amount: _addon, commission_allocation: _commission, ...item }) => item) });
+      setExpandedItems(saved.line_items.map(() => true));
     }
   }, [quoteQuery.data]);
 
@@ -318,12 +324,15 @@ export default function QuoteBuilder() {
   const toggleSection = (section: BuilderSection) => setSectionVisibility((current) => ({ ...current, [section]: !current[section] }));
   const setAllSections = (open: boolean) => setSectionVisibility(Object.fromEntries(Object.keys(defaultSectionVisibility).map((key) => [key, open])) as Record<BuilderSection, boolean>);
   const updateItem = (index: number, key: keyof QuoteLineItemInput, value: string | number) => setForm((current) => ({ ...current, line_items: current.line_items.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item) }));
-  const addItem = () => {
+  const addItem = (collapsePrevious = false) => {
     const nextIndex = form.line_items.length;
     setForm((current) => ({ ...current, line_items: [...current.line_items, emptyItem()] }));
+    setExpandedItems((current) => collapsePrevious ? [...current.map(() => false), true] : [...current, true]);
     window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>(`[data-testid="line-item-description-input-${nextIndex}"]`)?.focus());
   };
-  const removeItem = (index: number) => setForm((current) => ({ ...current, line_items: current.line_items.filter((_, itemIndex) => itemIndex !== index) }));
+  const removeItem = (index: number) => { setForm((current) => ({ ...current, line_items: current.line_items.filter((_, itemIndex) => itemIndex !== index) })); setExpandedItems((current) => current.filter((_, itemIndex) => itemIndex !== index)); };
+  const toggleItem = (index: number) => setExpandedItems((current) => current.map((expanded, itemIndex) => itemIndex === index ? !expanded : expanded));
+  const expandAllItems = () => setExpandedItems(form.line_items.map(() => true));
   const updateTerm = (index: number, key: "title" | "content", value: string) => setForm((current) => ({ ...current, terms_conditions: current.terms_conditions.map((term, termIndex) => termIndex === index ? { ...term, [key]: value } : term) }));
   const addTerm = () => setForm((current) => ({ ...current, terms_conditions: [...current.terms_conditions, { id: crypto.randomUUID(), title: "New Term", content: "Enter the quotation term or condition." }] }));
   const removeTerm = (index: number) => setForm((current) => ({ ...current, terms_conditions: current.terms_conditions.filter((_, termIndex) => termIndex !== index) }));
@@ -358,8 +367,9 @@ export default function QuoteBuilder() {
 
             <section className="border border-slate-200 bg-white p-6 lg:p-7 print:border-0 print:p-0"><div className="mb-6 flex items-start justify-between gap-4"><div><p className="data-label text-orange-600">03 / Scope &amp; rates</p><h2 data-testid="line-items-section-heading" className="mt-2 font-heading text-2xl font-bold tracking-tight">Commercial line items</h2><p className="mt-2 text-sm text-slate-500">Daily charges multiply by duration. Lump sum charges use one unit.</p></div><SectionToggleButton section="commercial" open={sectionVisibility.commercial} onToggle={() => toggleSection("commercial")} /></div>
               <div data-testid="commercial-section-content" className={sectionVisibility.commercial ? "block" : "hidden"}>
-              <div className="space-y-4">{form.line_items.map((item, index) => <LineItemEditor key={index} item={item} index={index} currency={form.currency} builderMode={form.builder_mode} commissionPerLine={totals.commissionPerLine} itemCount={form.line_items.length} isLast={index === form.line_items.length - 1} onUpdate={(key, value) => updateItem(index, key, value)} onRemove={() => removeItem(index)} onAddNext={addItem} />)}</div>
-              <Button data-testid="add-line-item-button" onClick={addItem} variant="outline" className="mt-4 w-full rounded-none border-dashed border-slate-300 py-6 text-slate-700 hover:border-orange-400 hover:bg-orange-50 hover:text-orange-700"><Plus size={16} /> Add item</Button>
+              <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3"><span className="text-xs text-slate-500">{form.line_items.length} commercial item{form.line_items.length === 1 ? "" : "s"}</span><Button data-testid="expand-all-items-button" onClick={expandAllItems} variant="outline" size="sm" className="rounded-none border-slate-300"><ChevronDown size={14} /> Expand all items</Button></div>
+              <div className="space-y-4">{form.line_items.map((item, index) => <LineItemEditor key={index} item={item} index={index} currency={form.currency} builderMode={form.builder_mode} commissionPerLine={totals.commissionPerLine} itemCount={form.line_items.length} isLast={index === form.line_items.length - 1} expanded={expandedItems[index] ?? true} onUpdate={(key, value) => updateItem(index, key, value)} onRemove={() => removeItem(index)} onAddNext={() => addItem(true)} onToggle={() => toggleItem(index)} />)}</div>
+              <Button data-testid="add-line-item-button" onClick={() => addItem(false)} variant="outline" className="mt-4 w-full rounded-none border-dashed border-slate-300 py-6 text-slate-700 hover:border-orange-400 hover:bg-orange-50 hover:text-orange-700"><Plus size={16} /> Add item</Button>
               {form.builder_mode === "quote_only" && <div data-testid="overall-cost-card" className="mt-4 border border-orange-200 bg-orange-50/60 p-4"><Field label="Overall cost" testId="overall-cost"><input data-testid="overall-cost-input" type="number" min="0" step="0.01" value={form.overall_cost} onChange={(event) => updateForm("overall_cost", Number(event.target.value))} placeholder="Enter total internal cost for the complete quotation" className="w-full border border-orange-300 bg-white px-3 py-2.5 font-mono text-sm outline-none placeholder:font-sans placeholder:text-slate-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></Field><p className="mt-2 text-xs leading-5 text-slate-600">Overall margin uses item selling prices before commission and tax. Hidden per-line costing remains saved if you switch back.</p></div>}
               </div>
             </section>
