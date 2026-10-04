@@ -1,0 +1,90 @@
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { Activity, ArrowUpRight, BarChart3, BookOpen, CircleDollarSign, FilePlus2, Search, TrendingUp } from "lucide-react";
+import { apiGet } from "@/lib/api";
+import { CATEGORY_LABELS, formatMoney, type Quote } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+
+const fetchQuotes = () => apiGet<Quote[]>("/quotes");
+
+function MetricCard({ label, value, detail, accent = false, icon: Icon }: { label: string; value: string; detail: string; accent?: boolean; icon: typeof TrendingUp }) {
+  return (
+    <div data-testid={`dashboard-metric-${label.toLowerCase().replaceAll(" ", "-")}`} className={`border border-slate-200 p-5 ${accent ? "bg-orange-50" : "bg-white"}`}>
+      <div className="flex items-start justify-between">
+        <p className="data-label">{label}</p>
+        <Icon size={17} className={accent ? "text-orange-600" : "text-slate-400"} aria-hidden="true" />
+      </div>
+      <p className="mt-5 font-mono text-2xl font-bold tracking-tight text-slate-950">{value}</p>
+      <p className="mt-2 text-xs text-slate-500">{detail}</p>
+    </div>
+  );
+}
+
+export default function Dashboard() {
+  const [search, setSearch] = useState("");
+  const quotesQuery = useQuery({ queryKey: ["quotes"], queryFn: fetchQuotes, retry: false });
+  const quotes = quotesQuery.data ?? [];
+  const filteredQuotes = useMemo(
+    () => quotes.filter((quote) => `${quote.quote_number} ${quote.client_company} ${quote.client_name}`.toLowerCase().includes(search.toLowerCase())),
+    [quotes, search],
+  );
+  const totals = useMemo(() => {
+    const revenue = quotes.reduce((sum, quote) => sum + quote.grand_total, 0);
+    const cost = quotes.reduce((sum, quote) => sum + quote.total_cost, 0);
+    const profit = quotes.reduce((sum, quote) => sum + quote.gross_profit, 0);
+    const currencies = new Set(quotes.map((quote) => quote.currency));
+    const margin = currencies.size <= 1 && revenue ? (profit / quotes.reduce((sum, quote) => sum + quote.subtotal, 0)) * 100 : null;
+    const displayCurrency = currencies.size === 1 ? [...currencies][0] : "USD";
+    return { revenue, cost, profit, margin, currencyCount: currencies.size, displayCurrency };
+  }, [quotes]);
+  const trackedDetail = totals.currencyCount > 1 ? `Across ${totals.currencyCount} currencies` : "Including optional tax";
+  const value = (amount: number) => totals.currencyCount > 1 ? "MULTI" : formatMoney(amount, totals.displayCurrency);
+
+  return (
+    <div className="min-h-svh bg-[#f4f4f5] text-slate-950">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1500px] items-center justify-between px-5 py-4 lg:px-8">
+          <Link to="/" data-testid="app-logo-link" className="flex items-center gap-3">
+            <span className="grid h-9 w-9 place-items-center bg-orange-600 text-white"><Activity size={19} /></span>
+            <span><span className="block font-heading text-lg font-bold tracking-tight">QUOTEFORGE</span><span className="data-label block text-[9px] text-orange-600">Energy commerce desk</span></span>
+          </Link>
+          <div className="flex items-center gap-3">
+            <span data-testid="dashboard-status" className="hidden items-center gap-2 text-xs text-slate-500 sm:flex"><span className="h-2 w-2 bg-emerald-500" /> Workspace ready</span>
+            <Link to="/quotes/new" data-testid="dashboard-new-quote-button" className={buttonVariants({ size: "sm" }) + " rounded-none bg-orange-600 px-4 text-white hover:bg-orange-700"}><FilePlus2 size={16} /> New quote</Link>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-[1500px] px-5 py-8 lg:px-8 lg:py-10">
+        <div className="mb-9 flex flex-col justify-between gap-6 md:flex-row md:items-end">
+          <div>
+            <p className="data-label text-orange-600">Commercial release / overview</p>
+            <h1 data-testid="dashboard-heading" className="mt-3 max-w-2xl font-heading text-4xl font-bold tracking-[-0.055em] text-slate-950 sm:text-5xl">Quote intelligence for the field.</h1>
+            <p data-testid="dashboard-subheading" className="mt-4 max-w-xl text-base leading-7 text-slate-600">Build defensible oil &amp; gas offers, see your margin before release, and keep every client conversation in one place.</p>
+          </div>
+          <div className="flex items-center gap-2 border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500"><BookOpen size={15} className="text-orange-600" /> {quotes.length} saved {quotes.length === 1 ? "quote" : "quotes"}</div>
+        </div>
+
+        <section aria-label="Business performance" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="Quoted revenue" value={value(totals.revenue)} detail={trackedDetail} icon={CircleDollarSign} />
+          <MetricCard label="Total cost" value={value(totals.cost)} detail={totals.currencyCount > 1 ? "Commercial cost basis" : "Commercial cost basis"} icon={BarChart3} />
+          <MetricCard label="Gross profit" value={value(totals.profit)} detail="Before overhead allocation" accent icon={TrendingUp} />
+          <MetricCard label="Average margin" value={totals.margin === null ? "—" : `${totals.margin.toFixed(1)}%`} detail={totals.currencyCount > 1 ? "Compare within one currency" : "Across saved quotations"} icon={ArrowUpRight} />
+        </section>
+
+        <section className="mt-10 border border-slate-200 bg-white">
+          <div className="flex flex-col justify-between gap-4 border-b border-slate-200 px-5 py-5 md:flex-row md:items-center lg:px-6">
+            <div><p className="data-label text-orange-600">Quote database</p><h2 data-testid="quote-history-heading" className="mt-2 font-heading text-2xl font-bold tracking-tight">Release history</h2></div>
+            <label className="flex min-w-[260px] items-center gap-2 border border-slate-200 px-3 py-2 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-100"><Search size={16} className="text-slate-400" /><span className="sr-only">Search saved quotes</span><input data-testid="quote-history-search-input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search quote, company or contact" className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400" /></label>
+          </div>
+          {quotesQuery.isError && <div data-testid="quote-history-error" className="m-6 border border-orange-200 bg-orange-50 p-4 text-sm text-orange-800">History is temporarily unavailable. You can still open a new quote and continue working.</div>}
+          {!quotesQuery.isError && filteredQuotes.length === 0 && <div data-testid="quote-history-empty" className="grid min-h-[230px] place-items-center px-6 py-12 text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center border border-orange-200 bg-orange-50 text-orange-600"><FilePlus2 size={20} /></div><h3 className="mt-4 font-heading text-lg font-semibold">No releases in the database yet</h3><p className="mt-2 text-sm text-slate-500">Start with one quote and your commercial history will appear here.</p><Link to="/quotes/new" data-testid="quote-history-empty-new-button" className={buttonVariants({ variant: "outline", size: "sm" }) + " mt-5 rounded-none border-slate-300"}>Create first quote</Link></div></div>}
+          {filteredQuotes.length > 0 && <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left"><thead><tr className="border-b border-slate-200 bg-slate-50/80"><th className="px-6 py-3 data-label">Reference</th><th className="px-6 py-3 data-label">Client</th><th className="px-6 py-3 data-label">Scope</th><th className="px-6 py-3 data-label">Release value</th><th className="px-6 py-3 data-label">Margin</th><th className="px-6 py-3 data-label">Status</th><th className="px-6 py-3" /></tr></thead><tbody>{filteredQuotes.map((quote, index) => <tr data-testid={`quote-history-row-${quote.id}`} key={quote.id} className="group border-b border-slate-100 transition-colors hover:bg-orange-50/40" style={{ animationDelay: `${index * 50}ms` }}><td className="px-6 py-4"><Link to={`/quotes/${quote.id}`} data-testid={`quote-history-reference-${quote.id}`} className="font-mono text-sm font-bold text-slate-950 hover:text-orange-700">{quote.quote_number}</Link><span className="mt-1 block text-xs text-slate-500">{quote.issue_date}</span></td><td className="px-6 py-4"><span data-testid={`quote-history-client-${quote.id}`} className="block text-sm font-semibold text-slate-800">{quote.client_company}</span><span className="mt-1 block text-xs text-slate-500">{quote.client_name}</span></td><td className="px-6 py-4"><div className="flex flex-wrap gap-1">{Array.from(new Set(quote.line_items.map((item) => item.category))).map((category) => <Badge data-testid={`quote-history-category-${quote.id}-${category}`} key={category} variant="outline" className="rounded-none border-slate-200 text-[10px] uppercase tracking-wider">{CATEGORY_LABELS[category]}</Badge>)}</div></td><td data-testid={`quote-history-total-${quote.id}`} className="px-6 py-4 font-mono text-sm font-semibold">{formatMoney(quote.grand_total, quote.currency)}</td><td data-testid={`quote-history-margin-${quote.id}`} className="px-6 py-4"><span className="bg-orange-50 px-2 py-1 font-mono text-sm font-bold text-orange-700">{quote.margin_percent.toFixed(1)}%</span></td><td className="px-6 py-4"><span data-testid={`quote-history-status-${quote.id}`} className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500"><span className="h-1.5 w-1.5 bg-slate-400" /> {quote.status}</span></td><td className="px-6 py-4 text-right"><Link to={`/quotes/${quote.id}`} data-testid={`quote-history-open-${quote.id}`} className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-orange-700 opacity-70 transition-opacity group-hover:opacity-100">Open <ArrowUpRight size={14} /></Link></td></tr>)}</tbody></table></div>}
+        </section>
+        <p data-testid="dashboard-footer-note" className="mt-6 text-xs text-slate-400">All values are working commercial estimates. Review cost basis, tax treatment, and client terms before release.</p>
+      </main>
+    </div>
+  );
+}

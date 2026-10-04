@@ -1,0 +1,142 @@
+{
+  "theme": "Light mode with industrial orange accents",
+  "archetype": "ARCHETYPE 4: SWISS & HIGH-CONTRAST + ARCHETYPE 1: ORGANIC (Orange accent) Hybrid",
+  "typography": {
+    "fonts": {
+      "headings": "Cabinet Grotesk",
+      "body": "IBM Plex Sans",
+      "mono": "JetBrains Mono"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tighter font-black",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-bold",
+      "h3": "text-xl sm:text-2xl tracking-tight font-semibold",
+      "h4": "text-lg sm:text-xl tracking-tight font-medium",
+      "body": "text-base leading-relaxed text-slate-700",
+      "labels": "text-xs tracking-[0.2em] uppercase font-bold text-slate-500",
+      "data": "font-mono text-sm tracking-tight text-slate-900"
+    },
+    "rules": [
+      "Never use Inter or generic sans for headings. Use Cabinet Grotesk for industrial weight.",
+      "Headings must use tight letter spacing.",
+      "Overlines and labels must be uppercase, tiny, wide spacing.",
+      "Data tables must use monospaced fonts for numerical alignment."
+    ]
+  },
+  "colors": {
+    "background": {
+      "page": "#F4F4F5",
+      "surface": "#FFFFFF",
+      "surface_alt": "#FAFAFA"
+    },
+    "text": {
+      "primary": "#0F172A",
+      "secondary": "#475569",
+      "tertiary": "#94A3B8"
+    },
+    "accent": {
+      "primary": "#EA580C",
+      "primary_hover": "#C2410C",
+      "primary_light": "#FFF7ED",
+      "danger": "#DC2626",
+      "success": "#16A34A"
+    },
+    "border": "#E2E8F0",
+    "rules": [
+      "Use orange ONLY for primary CTAs (e.g., 'Generate PDF', 'Save Quote') and critical data highlights.",
+      "Never use pure black or pure gray. Grays are tinted with cool slate.",
+      "Backgrounds should be flat, no generic full-screen gradients."
+    ]
+  },
+  "layouts": {
+    "dashboard": {
+      "style": "High Density Grid",
+      "classes": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+      "usage": "For the persistent saved quotes history and P&L overview."
+    },
+    "quote_builder": {
+      "style": "The Bento Grid Protocol",
+      "classes": "grid grid-cols-1 lg:grid-cols-12 gap-8",
+      "usage": "For the quote data entry. Left column (col-span-8) for line items and calculations, Right column (col-span-4) for global settings (currency, tax, payment terms, delivery lead time)."
+    },
+    "surfaces": {
+      "card": "bg-white border border-slate-200 rounded-none shadow-sm hover:shadow-md transition-shadow duration-200 p-6",
+      "table_container": "bg-white border border-slate-200 rounded-none overflow-hidden",
+      "header": "sticky top-0 z-50 backdrop-blur-xl bg-white/70 border-b border-slate-200"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-orange-600 text-white hover:bg-orange-700 font-medium px-6 py-2 rounded-none transition-colors duration-200",
+      "secondary": "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium px-6 py-2 rounded-none transition-colors duration-200"
+    },
+    "inputs": {
+      "text": "border border-slate-300 bg-white px-3 py-2 text-sm rounded-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors text-slate-900",
+      "select": "border border-slate-300 bg-white px-3 py-2 text-sm rounded-none focus:ring-2 focus:ring-orange-500 transition-colors text-slate-900",
+      "table_input": "border-0 border-b border-transparent hover:border-slate-300 focus:border-orange-500 bg-transparent px-2 py-1 focus:bg-orange-50 w-full text-sm font-mono transition-colors"
+    },
+    "rules": [
+      "Do NOT use HTML-based components for advanced user interactions. Use Shadcn JS components.",
+      "Go cardless or use extremely sharp, rectangular, dense styles (rounded-none).",
+      "Use standard Shadcn components for tables, dropdowns, dialogs, tabs, overriding border-radius to 0px."
+    ]
+  },
+  "motion": {
+    "rules": [
+      "Minimalist animations.",
+      "Hover states for all interactive elements (e.g., -translate-y-[1px] for cards, color changes).",
+      "Smooth staggered entrance animations for quote history lists.",
+      "Do NOT use 'transition: all'. Apply explicit transitions (e.g., transition-colors)."
+    ]
+  },
+  "accessibility": {
+    "rules": [
+      "All interactive elements MUST include data-testid.",
+      "Maintain high contrast ratios (APCA/WCAG AA).",
+      "Focus rings MUST be visible (e.g., ring-2 ring-orange-500).",
+      "Do not use fully transparent headers over content. Must use bg-white/70 with backdrop-blur."
+    ]
+  },
+  "media": {
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1784915478994-8f219142850c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NjZ8MHwxfHNlYXJjaHwzfHxvaWwlMjByaWclMjBwbGF0Zm9ybSUyMGluZHVzdHJpYWx8ZW58MHx8fHwxNzkxMDc1NzIzfDA&ixlib=rb-4.1.0&q=85",
+        "description": "Massive offshore drilling rig against a clear blue sky",
+        "category": "Hero/Login Background or Empty State Illustration"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1503387837-b154d5074bd2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MDV8MHwxfHNlYXJjaHwzfHxlbmdpbmVlciUyMGJsdWVwcmludHMlMjB0YWJsZXxlbnwwfHx8fDE3OTEwNzU3MjN8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Person drafting on blueprint",
+        "category": "Quote Generation empty state or documentation header"
+      }
+    ],
+    "icons": {
+      "library": "@phosphor-icons/react",
+      "install_command": "yarn add @phosphor-icons/react",
+      "rules": "Use Duotone or Regular weight. Perfect for dense dashboards and industrial precision."
+    }
+  },
+  "visual_enhancers": [
+    "Grid Borders (The Technical Look): Use border-collapse style layout for the P&L calculation grids to expose the skeleton.",
+    "Data Highlighting: Use a soft orange tint (bg-orange-50) for the 'Margin' and 'Total Profit' cells to draw attention immediately.",
+    "Document Preview: For the 'Customize Quotation Page', implement a 'Neumorphic Tactile' view where the document looks like a physical A4 paper sitting on a slightly darker gray workspace with a soft ambient shadow."
+  ],
+  "instructions_to_main_agent": [
+    "Create a robust multipage or multi-tab layout using React and Tailwind.",
+    "Implement a 'Dashboard' view showing persistent saved quotes (History) and total margins.",
+    "Implement a 'Quote Builder' view with sections for Client Details (editable placeholders), Line Items (Sales, Rental, Services with UoM toggle, daily/lump-sum toggle), and Settings (Tax, Payment Terms, Lead Time, Currency).",
+    "Include real-time Margin and P&L calculation logic at the bottom of the quote builder.",
+    "For the PDF Export, provide a 'Preview' modal or section that visually represents an A4 page, allowing the user to customize placeholders (client name, company) before printing.",
+    "Do NOT use TypeScript (.tsx), use plain JavaScript (.js) for components.",
+    "Use Phosphor Icons for technical, sharp iconography.",
+    "Apply 'data-testid' to ALL buttons, inputs, toggles, and critical data display elements."
+  ],
+  "universal_guidelines_for_main_agent": [
+    "Avoid generic 'AI slop' UI. Do not center-align the main app layout. Maintain left-alignment for all dense data and forms.",
+    "Create depth through subtle structural layers (e.g., page background vs card background) rather than heavy drop shadows.",
+    "Use glass-morphism effects carefully on sticky headers only. No fully transparent overlay backgrounds.",
+    "Never apply 'transition: all'. Apply specific transitions.",
+    "Ensure the UI looks extremely professional, catering to the Oil & Gas sector—sharp, clean, high-contrast, data-dense.",
+    "Use 'sonner' for all toast notifications."
+  ]
+}
