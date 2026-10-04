@@ -1,0 +1,46 @@
+{
+  "iteration": 3,
+  "summary": "All 4 direct-download PDF (jsPDF/jsPDF-AutoTable) acceptance criteria exercised via 5 browser check artifacts (one criterion covered by the public-preview-ingress run in addition to localhost), all passed. No backend test files added: all 4 criteria are client-side PDF generation behavior (jsPDF runs entirely in the browser, no API endpoint backs the download action) verified via downloaded-file inspection (PDF signature, pypdf text/page extraction, metadata) plus one localhost-vs-public-preview cross-check.",
+  "passed": 5,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Download PDF action is available at the top of Quote Builder",
+      "name": "quote-download-button-enabled-after-hydrate",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created a tscheck quote (30 line items, complete release details) via API. Delayed the GET /api/quotes/{id} response 1.5s and navigated to /quotes/{id}: while loading, a 'Loading quote…' button was visible and builder-download-pdf-button had count 0 (no disabled final-action button rendered pre-hydration). After the delayed response resolved, builder-download-pdf-button became visible and enabled beside builder-preview-button (Print/PDF)."
+    },
+    {
+      "criterion": "Downloaded filename combines quotation number and subject",
+      "name": "quote-download-filename-matches-number-subject",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created a quote via API with quote_number 'Q-DOWNLOAD-VERIFY' and subject 'Supply of API 6A Valves' (30 line items, PT. Nasaktion Solusi Indonesia / Zekha Anendetha per seed facts). Clicked builder-download-pdf-button and captured the Playwright download event: download.suggestedFilename() === 'Q-DOWNLOAD-VERIFY-Supply-of-API-6A-Valves.pdf', matching the safe-hyphenated expected filename exactly. Quote deleted after verification."
+    },
+    {
+      "criterion": "Direct download is a valid customer-only A4 PDF",
+      "name": "quote-download-pdf-valid-customer-only-content",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created a tscheck quote (30 line items, tax enabled) via API, triggered the download, saved it to /tmp and parsed with pypdf: file bytes begin with '%PDF' signature; extracted text contains 'Terms and Conditions', 'Customer Acceptance' and 'COMMERCIAL OFFER' plus the supplier company name 'PT. Nasaktion Solusi Indonesia'; none of the editor-only control labels ('Download PDF', 'Save quote', 'Print / PDF', 'Saved record', 'Edit quotation') leaked into the PDF text; PDF metadata title included the quote subject and contained no browser URL/localhost string, and metadata author equalled the company name (no browser-injected date/title/URL print metadata)."
+    },
+    {
+      "criterion": "Long direct-download PDFs paginate with repeated headers and page numbers",
+      "name": "quote-download-pdf-pagination-overflow",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created a tscheck quote with 32 line items via API, triggered the download and parsed the saved PDF with pypdf: resulting file has 4 physical pages (>=4 required); every page's extracted text matches /CONFIDENTIAL/ and a 'Page X of Y' pattern where X increments 1..4 and Y=4 on all pages; overflow pages (index > 0) contain both the repeated quotation header (the quote number string) and further 'Tscheck pagination line' items, proving header + table content carries onto overflow pages."
+    },
+    {
+      "criterion": "Downloaded filename combines quotation number and subject (public ingress cross-check)",
+      "name": "quote-download-pdf-public-preview",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Ran against public preview URL https://invoice-forge-67.preview.emergentagent.com. Created a tscheck quote (30 line items) via API, clicked builder-download-pdf-button, captured download.suggestedFilename() matching the expected quote-number+subject pattern, saved the file and confirmed its bytes begin with '%PDF', proving the direct-download jsPDF flow works end-to-end through the public ingress path, not just localhost."
+    }
+  ]
+}
