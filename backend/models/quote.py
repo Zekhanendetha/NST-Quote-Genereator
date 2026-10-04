@@ -12,7 +12,7 @@ PriceMethod = Literal["sell_rate", "margin"]
 
 
 class QuoteLineItemInput(BaseModel):
-    description: str = Field(min_length=1)
+    description: str = ""
     description_details: str = ""
     category: LineCategory
     charge_type: ChargeType

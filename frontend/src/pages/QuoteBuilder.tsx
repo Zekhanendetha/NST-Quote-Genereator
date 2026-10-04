@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Calculator, Check, ChevronRight, Download, FileText, Plus, Printer, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Calculator, Check, ChevronRight, Download, FileText, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiPut } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -96,7 +96,7 @@ function QuotationLineRow({ item, index, currency, commissionPerLine }: { item: 
 
   return (
     <tr data-testid={`preview-line-item-${index}`} className="border-b border-slate-100 align-top">
-      <td className="py-2.5 pr-5"><span data-testid={`preview-line-description-${index}`} className="font-semibold">{item.description || "Scope description"}</span>{item.description_details && <span data-testid={`preview-line-details-${index}`} className="mt-1 block whitespace-pre-line text-[10px] leading-4 text-slate-500">{item.description_details}</span>}</td>
+      <td className="py-2.5 pr-5"><span data-testid={`preview-line-description-${index}`} className="font-semibold">{item.description || "—"}</span>{item.description_details && <span data-testid={`preview-line-details-${index}`} className="mt-1 block whitespace-pre-line text-[10px] leading-4 text-slate-500">{item.description_details}</span>}</td>
       <td data-testid={`preview-line-category-${index}`} className="py-2.5 pr-3"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-700">{CATEGORY_LABELS[item.category]}</span><span className="mt-1 block text-[9px] uppercase tracking-wider text-slate-400">{basis}</span></td>
       <td data-testid={`preview-line-quantity-${index}`} className="py-2.5 text-right font-mono text-[10px]">{item.quantity}</td>
       <td data-testid={`preview-line-uom-${index}`} className="py-2.5 text-right text-[10px]"><span className="uppercase">{item.uom}</span>{item.category !== "sales" && item.charge_type === "daily" && <span className="mt-1 block text-[9px] text-slate-400">{item.duration_days} day{item.duration_days === 1 ? "" : "s"}</span>}</td>
@@ -262,7 +262,6 @@ export default function QuoteBuilder() {
     if (!(form.valid_days > 0)) missing.push("Quotation validity period");
     if (!form.line_items.length) missing.push("At least one commercial line item");
     form.line_items.forEach((item, index) => {
-      if (!item.description.trim()) missing.push(`Line ${index + 1}: description`);
       if (!item.uom.trim()) missing.push(`Line ${index + 1}: unit of measure`);
     });
     return missing;
@@ -278,14 +277,13 @@ export default function QuoteBuilder() {
     onError: () => toast.error("Unable to save this quote. Check the required fields and try again."),
   });
 
-  const canSave = form.client_name.trim() && form.client_company.trim() && form.company_name.trim() && (form.currency === "USD" || (form.usd_exchange_rate ?? 0) > 0) && form.line_items.length > 0 && form.line_items.every((item) => item.description.trim() && item.uom.trim());
+  const canSave = form.client_name.trim() && form.client_company.trim() && form.company_name.trim() && (form.currency === "USD" || (form.usd_exchange_rate ?? 0) > 0) && form.line_items.length > 0 && form.line_items.every((item) => item.uom.trim());
   const canPrint = missingReleaseFields.length === 0;
-  const printQuote = () => { if (!canPrint) { toast.error("Save the quotation and complete subject, release date, and all preparer contact fields before PDF release."); return; } const originalTitle = document.title; document.title = ""; window.print(); document.title = originalTitle; };
   const downloadPdf = async () => { if (missingReleaseFields.length) { setMissingFieldsOpen(true); return; } setIsDownloading(true); try { const pages = Array.from(document.querySelectorAll<HTMLElement>("[data-pdf-page='true']")); const filename = await generateQuotePdf({ pages, quoteNumber: documentReference, subject: form.subject, companyName: form.company_name }); toast.success(`Downloaded ${filename}`); } catch { toast.error("Unable to generate the PDF. Please try Print / PDF instead."); } finally { setIsDownloading(false); } };
 
   return (
     <div className="min-h-svh bg-[#f4f4f5] text-slate-950">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur-xl print:hidden"><div className="mx-auto flex max-w-[1500px] items-center justify-between px-5 py-4 lg:px-8"><div className="flex items-center gap-4"><Link to="/" data-testid="builder-back-button" className="grid h-9 w-9 place-items-center border border-slate-200 text-slate-500 transition-colors hover:border-orange-500 hover:text-orange-600"><ArrowLeft size={16} /></Link><div><p className="data-label text-orange-600">NASAKTION / Quote Generator</p><h1 data-testid="builder-heading" className="mt-1 font-heading text-xl font-bold tracking-tight">{id ? "Edit quotation" : "New quotation"}</h1></div></div><div className="flex items-center gap-2"><span data-testid="builder-draft-status" className="hidden text-xs text-slate-500 sm:block">{id ? "Saved record" : "Unsaved draft"}</span>{id && quoteQuery.isLoading ? <Button disabled size="sm" className="rounded-none bg-slate-900 text-white"><Download size={15} /> Loading quote…</Button> : <Button data-testid="builder-download-pdf-button" onClick={downloadPdf} disabled={isDownloading} title={canPrint ? "Download the customer release PDF" : "Review missing release data"} size="sm" className="rounded-none bg-slate-900 text-white hover:bg-slate-800"><Download size={15} /> {isDownloading ? "Generating…" : "Download PDF"}</Button>}<Button data-testid="builder-preview-button" onClick={printQuote} disabled={!canPrint} title={canPrint ? "Print or save the customer release as PDF" : "Save and complete release details first"} variant="outline" size="sm" className="rounded-none border-slate-300"><Printer size={15} /> Print / PDF</Button><Button data-testid="builder-save-button" onClick={() => saveMutation.mutate()} disabled={!canSave || saveMutation.isPending} size="sm" className="rounded-none bg-orange-600 px-4 text-white hover:bg-orange-700"><Save size={15} /> {saveMutation.isPending ? "Saving…" : "Save quote"}</Button></div></div></header>
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur-xl print:hidden"><div className="mx-auto flex max-w-[1500px] items-center justify-between px-5 py-4 lg:px-8"><div className="flex items-center gap-4"><Link to="/" data-testid="builder-back-button" className="grid h-9 w-9 place-items-center border border-slate-200 text-slate-500 transition-colors hover:border-orange-500 hover:text-orange-600"><ArrowLeft size={16} /></Link><div><p className="data-label text-orange-600">NASAKTION / Quote Generator</p><h1 data-testid="builder-heading" className="mt-1 font-heading text-xl font-bold tracking-tight">{id ? "Edit quotation" : "New quotation"}</h1></div></div><div className="flex items-center gap-2"><span data-testid="builder-draft-status" className="hidden text-xs text-slate-500 sm:block">{id ? "Saved record" : "Unsaved draft"}</span>{id && quoteQuery.isLoading ? <Button disabled size="sm" className="rounded-none bg-slate-900 text-white"><Download size={15} /> Loading quote…</Button> : <Button data-testid="builder-download-pdf-button" onClick={downloadPdf} disabled={isDownloading} title={canPrint ? "Download the customer release PDF" : "Review missing release data"} size="sm" className="rounded-none bg-slate-900 text-white hover:bg-slate-800"><Download size={15} /> {isDownloading ? "Generating…" : "Download PDF"}</Button>}<Button data-testid="builder-save-button" onClick={() => saveMutation.mutate()} disabled={!canSave || saveMutation.isPending} size="sm" className="rounded-none bg-orange-600 px-4 text-white hover:bg-orange-700"><Save size={15} /> {saveMutation.isPending ? "Saving…" : "Save quote"}</Button></div></div></header>
 
       <main className="mx-auto max-w-[1500px] px-5 py-7 lg:px-8 lg:py-9">
         <div className="mb-7 flex items-center gap-2 text-xs text-slate-500 print:hidden"><Link to="/" className="hover:text-orange-600">Workspace</Link><ChevronRight size={14} /><span className="font-semibold text-slate-700">Quote builder</span></div>
