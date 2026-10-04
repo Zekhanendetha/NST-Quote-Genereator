@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Calculator, Check, ChevronRight, Download, FileText, Plus, Save, Trash2 } from "lucide-react";
@@ -8,9 +8,9 @@ import { apiGet, apiPost, apiPut } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { generateQuotePdf } from "@/lib/generateQuotePdf";
-import { CURRENCIES, CATEGORY_LABELS, formatMoney, type ChargeType, type CompanyProfile, type LineCategory, type PriceMethod, type Quote, type QuoteLineItemInput, type QuotePayload, type SalesPricing } from "@/lib/types";
+import { CURRENCIES, CATEGORY_LABELS, formatMoney, type ChargeType, type CompanyProfile, type CostAddonType, type LineCategory, type PriceMethod, type Quote, type QuoteLineItemInput, type QuotePayload, type SalesPricing } from "@/lib/types";
 
-const emptyItem = (): QuoteLineItemInput => ({ description: "", description_details: "", category: "service", charge_type: "daily", sales_pricing: "unit", uom: "day", quantity: 1, duration_days: 1, price_method: "sell_rate", sell_rate: 0, target_margin_percent: 0, cost_rate: 0, cost_addon_percent: 0 });
+const emptyItem = (): QuoteLineItemInput => ({ description: "", description_details: "", category: "service", charge_type: "daily", sales_pricing: "unit", uom: "day", quantity: 1, duration_days: 1, price_method: "sell_rate", sell_rate: 0, target_margin_percent: 0, cost_rate: 0, cost_addon_type: "none", cost_addon_percent: 0 });
 const initialForm: QuotePayload = { quote_number: "", release_date: "", client_name: "", client_company: "", client_email: "", client_location: "", customer_reference: "", delivery_point: "", company_name: "", company_address: "", company_email: "", company_phone: "", company_logo: "", prepared_by_name: "", prepared_by_title: "", prepared_by_email: "", prepared_by_phone: "", quote_title: "Commercial Quotation", subject: "", currency: "USD", usd_exchange_rate: 1, tax_enabled: false, tax_rate: 5, payment_terms: "30 days from invoice", lead_time: "To be confirmed", valid_days: 30, notes: "This quotation is subject to final scope confirmation and availability.", release_notes: "", commission_amount: 0, line_items: [emptyItem()] };
 
 const lineValue = (item: QuoteLineItemInput, rate: number) => item.category === "sales"
@@ -43,24 +43,33 @@ interface LineItemEditorProps {
   currency: string;
   commissionPerLine: number;
   itemCount: number;
+  isLast: boolean;
   onUpdate: (key: keyof QuoteLineItemInput, value: string | number) => void;
   onRemove: () => void;
+  onAddNext: () => void;
 }
 
-function LineItemEditor({ item, index, currency, commissionPerLine, itemCount, onUpdate, onRemove }: LineItemEditorProps) {
+function LineItemEditor({ item, index, currency, commissionPerLine, itemCount, isLast, onUpdate, onRemove, onAddNext }: LineItemEditorProps) {
   const baseCost = lineValue(item, item.cost_rate);
   const costAddon = baseCost * item.cost_addon_percent / 100;
   const quotedLineTotal = quotedBaseValue(item) + commissionPerLine;
+  const lineReadyForQuickAdd = item.description.trim() && item.quantity > 0 && item.cost_rate > 0 && (item.price_method === "sell_rate" ? item.sell_rate > 0 : item.target_margin_percent > 0);
+  const handleQuickAdd = (event: KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (event.key !== "Enter" || event.shiftKey || target.tagName === "TEXTAREA" || target.tagName === "BUTTON" || target.tagName === "SELECT" || !isLast || !lineReadyForQuickAdd) return;
+    event.preventDefault();
+    onAddNext();
+  };
 
   return (
-    <div data-testid={`line-item-card-${index}`} className="border border-slate-200 bg-slate-50/60 p-4 transition-colors hover:border-orange-200">
+    <div data-testid={`line-item-card-${index}`} onKeyDown={handleQuickAdd} className="border border-slate-200 bg-slate-50/60 p-4 transition-colors hover:border-orange-200">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2"><span className="grid h-6 w-6 place-items-center bg-slate-900 font-mono text-xs text-white">{String(index + 1).padStart(2, "0")}</span><span data-testid={`line-item-label-${index}`} className="data-label text-slate-500">Pricing line</span></div>
         <button type="button" data-testid={`remove-line-item-button-${index}`} onClick={onRemove} disabled={itemCount === 1} className="p-1 text-slate-400 transition-colors hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30" aria-label="Remove line item"><Trash2 size={15} /></button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
-        <Field label="Description *" testId={`line-item-description-${index}`} className="md:col-span-5"><TextInput testId={`line-item-description-input-${index}`} value={item.description} onChange={(value) => onUpdate("description", value)} placeholder="e.g. Wellhead pressure control package" /></Field>
+        <Field label="Description · quick add" testId={`line-item-description-${index}`} className="md:col-span-5"><TextInput testId={`line-item-description-input-${index}`} value={item.description} onChange={(value) => onUpdate("description", value)} placeholder="e.g. Wellhead pressure control package" /></Field>
         <Field label="Category" testId={`line-item-category-${index}`} className="md:col-span-3"><select data-testid={`line-item-category-select-${index}`} value={item.category} onChange={(event) => onUpdate("category", event.target.value as LineCategory)} className="w-full border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100">{(Object.keys(CATEGORY_LABELS) as LineCategory[]).map((category) => <option key={category} value={category}>{CATEGORY_LABELS[category]}</option>)}</select></Field>
         <Field label="UoM" testId={`line-item-uom-${index}`} className="md:col-span-2"><select data-testid={`line-item-uom-select-${index}`} value={item.uom} onChange={(event) => onUpdate("uom", event.target.value)} className="w-full border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"><option value="day">Day</option><option value="hour">Hour</option><option value="month">Month</option><option value="set">Set</option><option value="each">Each</option><option value="lump sum">Lump sum</option></select></Field>
         <Field label="Quantity" testId={`line-item-quantity-${index}`} className="md:col-span-2"><input data-testid={`line-item-quantity-input-${index}`} type="number" min="0.01" step="0.01" value={item.quantity} onChange={(event) => onUpdate("quantity", Number(event.target.value))} className="w-full border border-slate-300 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></Field>
@@ -79,11 +88,12 @@ function LineItemEditor({ item, index, currency, commissionPerLine, itemCount, o
           <Field label="Sell rate / margin" testId={`line-item-price-method-${index}`} className="md:col-span-3"><div className="flex border border-slate-300 bg-slate-50 p-1">{(["sell_rate", "margin"] as PriceMethod[]).map((method) => <button type="button" data-testid={`line-item-price-method-${index}-${method}-button`} key={method} onClick={() => onUpdate("price_method", method)} className={`flex-1 px-2 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${item.price_method === method ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-orange-50"}`}>{method === "sell_rate" ? "Sell rate" : "Margin %"}</button>)}</div></Field>
           {item.price_method === "sell_rate" ? <Field label="Sell rate" testId={`line-item-sell-rate-${index}`} className="md:col-span-3"><input data-testid={`line-item-sell-rate-input-${index}`} type="number" min="0" step="0.01" value={item.sell_rate} onChange={(event) => onUpdate("sell_rate", Number(event.target.value))} className="w-full border border-slate-300 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></Field> : <Field label="Target margin %" testId={`line-item-margin-${index}`} className="md:col-span-3"><input data-testid={`line-item-margin-input-${index}`} type="number" min="0" max="99.99" step="0.1" value={item.target_margin_percent} onChange={(event) => onUpdate("target_margin_percent", Number(event.target.value))} className="w-full border border-orange-300 bg-orange-50 px-3 py-2.5 font-mono text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></Field>}
           <Field label="Cost" testId={`line-item-cost-rate-${index}`} className="md:col-span-3"><input data-testid={`line-item-cost-rate-input-${index}`} type="number" min="0" step="0.01" value={item.cost_rate} onChange={(event) => onUpdate("cost_rate", Number(event.target.value))} className="w-full border border-slate-300 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></Field>
-          <Field label="Cost added value %" testId={`line-item-cost-addon-${index}`} className="md:col-span-3"><input data-testid={`line-item-cost-addon-input-${index}`} type="number" min="0" step="0.1" value={item.cost_addon_percent} onChange={(event) => onUpdate("cost_addon_percent", Number(event.target.value))} placeholder="Gov tax / landing" className="w-full border border-slate-300 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></Field>
+          <Field label="Cost added value" testId={`line-item-cost-addon-${index}`} className="md:col-span-3"><select data-testid={`line-item-cost-addon-select-${index}`} value={item.cost_addon_type} onChange={(event) => { const type = event.target.value as CostAddonType; onUpdate("cost_addon_type", type); onUpdate("cost_addon_percent", type === "local_tax" ? 11 : type === "import_tax" ? 14 : 0); }} className="w-full border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"><option value="none">No cost add-on (0%)</option><option value="local_tax">Local Tax (11%)</option><option value="import_tax">Import Tax (14%) incl. landing cost</option><option value="custom">Customize Tax</option></select>{item.cost_addon_type === "custom" && <input data-testid={`line-item-cost-addon-input-${index}`} type="number" min="0" step="0.1" value={item.cost_addon_percent} onChange={(event) => onUpdate("cost_addon_percent", Number(event.target.value))} placeholder="Enter percentage" className="mt-2 w-full border border-orange-300 bg-orange-50 px-3 py-2.5 font-mono text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" />}</Field>
         </div>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200 pt-3 text-xs sm:grid-cols-4"><div><span className="block text-slate-500">Base cost</span><span data-testid={`line-item-base-cost-${index}`} className="mt-1 block font-mono font-semibold">{formatMoney(baseCost, currency)}</span></div><div><span className="block text-slate-500">Cost add-on</span><span data-testid={`line-item-cost-addon-amount-${index}`} className="mt-1 block font-mono font-semibold">{formatMoney(costAddon, currency)}</span></div><div><span className="block text-slate-500">Commission share</span><span data-testid={`line-item-commission-${index}`} className="mt-1 block font-mono font-semibold text-orange-700">+ {formatMoney(commissionPerLine, currency)}</span></div><div className="text-right"><span className="block text-slate-500">Quoted line total</span><span data-testid={`line-item-total-${index}`} className="mt-1 block font-mono font-bold text-slate-900">{formatMoney(quotedLineTotal, currency)}</span></div></div>
+      {isLast && <p data-testid={`line-item-enter-hint-${index}`} className="mt-3 text-right text-[10px] text-slate-400">Complete Description, Quantity, Sell Rate/Margin, and Cost — then press Enter to add the next item.</p>}
     </div>
   );
 }
@@ -269,7 +279,11 @@ export default function QuoteBuilder() {
 
   const updateForm = <K extends keyof QuotePayload>(key: K, value: QuotePayload[K]) => setForm((current) => ({ ...current, [key]: value }));
   const updateItem = (index: number, key: keyof QuoteLineItemInput, value: string | number) => setForm((current) => ({ ...current, line_items: current.line_items.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item) }));
-  const addItem = () => setForm((current) => ({ ...current, line_items: [...current.line_items, emptyItem()] }));
+  const addItem = () => {
+    const nextIndex = form.line_items.length;
+    setForm((current) => ({ ...current, line_items: [...current.line_items, emptyItem()] }));
+    window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>(`[data-testid="line-item-description-input-${nextIndex}"]`)?.focus());
+  };
   const removeItem = (index: number) => setForm((current) => ({ ...current, line_items: current.line_items.filter((_, itemIndex) => itemIndex !== index) }));
   const saveMutation = useMutation({
     mutationFn: () => id ? apiPut<Quote>(`/quotes/${id}`, form) : apiPost<Quote>("/quotes", form),
@@ -298,8 +312,9 @@ export default function QuoteBuilder() {
 
             <section className="border border-slate-200 bg-white p-6 lg:p-7 print:hidden"><p className="data-label text-orange-600">02 / Subject</p><h2 data-testid="subject-section-heading" className="mt-2 font-heading text-2xl font-bold tracking-tight">Quotation subject</h2><p className="mt-2 text-sm text-slate-500">This subject is reused in the proposal introduction and Terms &amp; Conditions.</p><div className="mt-5"><Field label="Subject" testId="quote-subject"><textarea data-testid="quote-subject-input" value={form.subject} onChange={(event) => updateForm("subject", event.target.value)} rows={3} placeholder="e.g. Supply of API 6A wellhead equipment and associated field services" className="w-full resize-y border border-slate-300 bg-white px-3 py-2.5 text-sm leading-6 outline-none placeholder:text-slate-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></Field></div></section>
 
-            <section className="border border-slate-200 bg-white p-6 lg:p-7 print:border-0 print:p-0"><div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><p className="data-label text-orange-600">03 / Scope &amp; rates</p><h2 data-testid="line-items-section-heading" className="mt-2 font-heading text-2xl font-bold tracking-tight">Commercial line items</h2><p className="mt-2 text-sm text-slate-500">Daily charges multiply by duration. Lump sum charges use one unit.</p></div><Button data-testid="add-line-item-button" onClick={addItem} variant="outline" size="sm" className="w-fit rounded-none border-slate-300"><Plus size={15} /> Add line item</Button></div>
-              <div className="space-y-4">{form.line_items.map((item, index) => <LineItemEditor key={index} item={item} index={index} currency={form.currency} commissionPerLine={totals.commissionPerLine} itemCount={form.line_items.length} onUpdate={(key, value) => updateItem(index, key, value)} onRemove={() => removeItem(index)} />)}</div>
+            <section className="border border-slate-200 bg-white p-6 lg:p-7 print:border-0 print:p-0"><div className="mb-6"><p className="data-label text-orange-600">03 / Scope &amp; rates</p><h2 data-testid="line-items-section-heading" className="mt-2 font-heading text-2xl font-bold tracking-tight">Commercial line items</h2><p className="mt-2 text-sm text-slate-500">Daily charges multiply by duration. Lump sum charges use one unit.</p></div>
+              <div className="space-y-4">{form.line_items.map((item, index) => <LineItemEditor key={index} item={item} index={index} currency={form.currency} commissionPerLine={totals.commissionPerLine} itemCount={form.line_items.length} isLast={index === form.line_items.length - 1} onUpdate={(key, value) => updateItem(index, key, value)} onRemove={() => removeItem(index)} onAddNext={addItem} />)}</div>
+              <Button data-testid="add-line-item-button" onClick={addItem} variant="outline" className="mt-4 w-full rounded-none border-dashed border-slate-300 py-6 text-slate-700 hover:border-orange-400 hover:bg-orange-50 hover:text-orange-700"><Plus size={16} /> Add item</Button>
             </section>
 
             <section className="border border-slate-200 bg-white p-6 lg:p-7 print:hidden"><div className="mb-5"><p className="data-label text-orange-600">04 / Internal view</p><h2 data-testid="margin-section-heading" className="mt-2 font-heading text-2xl font-bold tracking-tight">Margin &amp; P&amp;L snapshot</h2></div><div className="grid grid-cols-2 gap-px border border-slate-200 bg-slate-200 md:grid-cols-4"><div className="bg-white p-4"><p className="data-label">Revenue</p><p data-testid="pnl-revenue" className="mt-3 font-mono text-lg font-bold">{formatMoney(totals.subtotal, form.currency)}</p></div><div className="bg-white p-4"><p className="data-label">Cost + add-ons</p><p data-testid="pnl-cost" className="mt-3 font-mono text-lg font-bold">{formatMoney(totals.cost, form.currency)}</p></div><div className="bg-orange-50 p-4"><p className="data-label text-orange-700">Gross profit</p><p data-testid="pnl-profit" className="mt-3 font-mono text-lg font-bold text-orange-700">{formatMoney(totals.profit, form.currency)}</p></div><div className="bg-orange-50 p-4"><p className="data-label text-orange-700">Margin</p><p data-testid="pnl-margin" className="mt-3 font-mono text-lg font-bold text-orange-700">{totals.margin.toFixed(1)}%</p></div></div><p data-testid="pnl-guidance" className="mt-4 flex items-center gap-2 text-xs text-slate-500"><Calculator size={14} className="text-orange-600" /> Cost add-ons increase the internal cost base; commission is distributed into client-facing line prices.</p></section>

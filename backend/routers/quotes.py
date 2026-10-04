@@ -29,7 +29,8 @@ def build_quote(payload: QuoteCreate) -> Quote:
             commission_allocation = round(payload.commission_amount - round(commission_per_line, 2) * (len(payload.line_items) - 1), 2)
         base_total = base_line_value(item, item.sell_rate)
         base_cost = base_line_value(item, item.cost_rate)
-        cost_addon_amount = round(base_cost * item.cost_addon_percent / 100, 2)
+        cost_addon_percent = 11 if item.cost_addon_type == "local_tax" else 14 if item.cost_addon_type == "import_tax" else item.cost_addon_percent if item.cost_addon_type == "custom" else 0
+        cost_addon_amount = round(base_cost * cost_addon_percent / 100, 2)
         if item.price_method == "margin":
             base_total = (base_cost + cost_addon_amount) / (1 - item.target_margin_percent / 100)
         line_total = base_total + commission_allocation
@@ -40,7 +41,8 @@ def build_quote(payload: QuoteCreate) -> Quote:
         line_cost = round(line_cost, 2)
         items.append(
             QuoteLineItem(
-                **item.model_dump(),
+                **item.model_dump(exclude={"cost_addon_percent"}),
+                cost_addon_percent=cost_addon_percent,
                 line_total=line_total,
                 line_cost=line_cost,
                 base_total=round(base_total, 2),

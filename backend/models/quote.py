@@ -9,6 +9,7 @@ LineCategory = Literal["sales", "rental", "service"]
 ChargeType = Literal["daily", "lump_sum"]
 SalesPricing = Literal["unit", "line_total"]
 PriceMethod = Literal["sell_rate", "margin"]
+CostAddonType = Literal["none", "local_tax", "import_tax", "custom"]
 
 
 class QuoteLineItemInput(BaseModel):
@@ -24,6 +25,7 @@ class QuoteLineItemInput(BaseModel):
     sell_rate: float = Field(ge=0)
     target_margin_percent: float = Field(default=0, ge=0, lt=100)
     cost_rate: float = Field(ge=0)
+    cost_addon_type: CostAddonType = "custom"
     cost_addon_percent: float = Field(default=0, ge=0, le=1000)
 
 

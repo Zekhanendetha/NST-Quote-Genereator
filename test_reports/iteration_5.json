@@ -1,0 +1,53 @@
+{
+  "iteration": 5,
+  "summary": "New acceptance matrix (5 criteria) for the Commercial Line Items quick-add/cost-addon feature set. Added 1 backend test file (parametrized: local/import/custom/none) and 5 browser checks (1 run twice -- once localhost, once through the public preview ingress) covering Add-item button placement, Enter quick-add gating, the 4-option Cost Added Value selector, and the cost-addon calculation math. All 6 check artifacts passed; no bugs found.",
+  "passed": 6,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Add item action stays below the final commercial item",
+      "name": "lineitem-add-button-below-last-card",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "On /quotes/new: exactly one [data-testid='add-line-item-button'] exists, it is not inside the 'line-items-section-heading' row, and DOM compareDocumentPosition confirms it follows the last '[data-testid^=\"line-item-card-\"]' both before and after clicking it to create a new card (button stayed after the newest last card)."
+    },
+    {
+      "criterion": "Add item action stays below the final commercial item (public ingress cross-check)",
+      "name": "lineitem-add-button-below-last-card-public-preview",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Ran the same DOM-order assertions against https://invoice-forge-67.preview.emergentagent.com/quotes/new -- single Add item button, confirmed to remain after the last line card before and after adding a new line."
+    },
+    {
+      "criterion": "Enter creates the next line only when required quick-add values are complete",
+      "name": "lineitem-enter-quickadd-requires-complete-line",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Enter on an incomplete line (missing qty/cost/sell-rate) created 0 new cards; Enter inside the description textarea for details never created a card; once Description+Qty(3)+Cost(10)+SellRate(25) were all positive, Enter created exactly 1 new card and focused 'line-item-description-input-1'. Re-pressing Enter on the new incomplete line created 0 more cards; Enter fired on a focused <select> also created 0. Repeated the complete-line path using the Target Margin method (0% blocked, 20% created exactly 1 new card + focus)."
+    },
+    {
+      "criterion": "Cost Added Value uses four explicit options",
+      "name": "lineitem-cost-addon-four-options",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "line-item-cost-addon-select-0 option texts = ['No cost add-on (0%)','Local Tax (11%)','Import Tax (14%) incl. landing cost','Customize Tax'] with values ['none','local_tax','import_tax','custom']. The custom percentage input (line-item-cost-addon-input-0) is rendered only when 'custom' is selected, absent for the other 3."
+    },
+    {
+      "criterion": "Automatic and custom cost add-ons calculate correctly",
+      "name": "lineitem-cost-addon-calculates-correctly",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "With base cost pinned to 50 (lump-sum, qty 1, cost rate 50): None -> 0.00, Local Tax -> 5.50, Import Tax -> 7.00, Custom 8% -> 4.00 -- all read directly from line-item-cost-addon-amount-0."
+    },
+    {
+      "criterion": "Cost add-on rules persist through API",
+      "name": "test_cost_addon_persists_normalized",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Parametrized POST /quotes (base cost 50) for local_tax/import_tax/custom(8%)/none all returned 200 with line_items[0] = {cost_addon_type, cost_addon_percent, cost_addon_amount} normalized to (local_tax,11,5.5), (import_tax,14,7.0), (custom,8,4.0), (none,0,0.0); GET /quotes/{id} on reopen echoed the identical normalized values for all 4 cases (5 asserts total incl. shared regression test)."
+    }
+  ]
+}
